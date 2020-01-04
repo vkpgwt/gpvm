@@ -1,0 +1,30 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 42b7e6aff69372f51ecc7bb6318eb3e7879b011989f2342ab8c8985efff97949
+
+name:           gpvm
+version:        0.1.0.0
+category:       Web
+homepage:       https://github.com/githubuser/gpvm#readme
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2020 Author name here
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+
+executable gpvm
+  main-is: Main.hs
+  other-modules:
+      Paths_gpvm
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+  default-language: Haskell2010
