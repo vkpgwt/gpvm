@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 42b7e6aff69372f51ecc7bb6318eb3e7879b011989f2342ab8c8985efff97949
+-- hash: 7397a66e46138e8505389096d6dec4f8b00e1113185a9aa71e36ba79015f51b8
 
 name:           gpvm
 version:        0.1.0.0
@@ -22,6 +22,9 @@ extra-source-files:
 executable gpvm
   main-is: Main.hs
   other-modules:
+      VM
+      VM.Instruction
+      VM.State
       Paths_gpvm
   hs-source-dirs:
       src
