@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7397a66e46138e8505389096d6dec4f8b00e1113185a9aa71e36ba79015f51b8
+-- hash: d6650049cf727173921df9433e6a7a91eb8d6a3f602f7e0ad6f3cde1762038f2
 
 name:           gpvm
 version:        0.1.0.0
@@ -22,6 +22,7 @@ extra-source-files:
 executable gpvm
   main-is: Main.hs
   other-modules:
+      SelectionEngine
       VM
       VM.Instruction
       VM.State
@@ -29,5 +30,6 @@ executable gpvm
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
+      array >=0.5
+    , base >=4.7 && <5
   default-language: Haskell2010

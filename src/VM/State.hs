@@ -1,10 +1,11 @@
 module VM.State (State, withVM, step, run) where
+import           Data.Array
 import           Data.Int (Int8)
 import           VM
 import qualified VM.Instruction as I
 
 data State = State { code :: Code
-                   , stack :: [VM.Word]
+                   , stack :: Array Int VM.Word
                    , sp :: Int
                    , pc :: Int
                    } deriving (Show)
@@ -18,12 +19,13 @@ data RunResult = RunEnded | RunMaxInstructionsReached
 stackSize = 16
 
 withVM :: VM -> Maybe State
-withVM (VM [])   = Nothing
-withVM (VM code) = Just State { code = code
-                              , stack = map (const 0) [1..stackSize]
-                              , sp = 0
-                              , pc = 0
-                              }
+withVM (VM code)
+    | null (assocs code) = Nothing
+    | otherwise = Just State { code = code
+                             , stack = listArray (0, stackSize-1) (repeat 0)
+                             , sp = 0
+                             , pc = 0
+                             }
 
 run :: Int -> State -> (State, RunResult)
 run maxSteps state
@@ -42,7 +44,7 @@ step state = (transform fs state, result)
                                             , StepOk)
                              I.End       -> ([incSP spDelta], StepEndInstruction)
 
-          instruction = code state !! pc state
+          instruction = code state ! pc state
           opcode      = I.opcode instruction
           arg         = fromIntegral (I.arg instruction) :: Int
           spDelta     = fromIntegral (I.spDelta instruction) :: Int
@@ -52,14 +54,10 @@ transform fs = foldl (.) id (reverse fs)
 
 putToStack :: Int -> VM.Word -> State -> State
 putToStack relIdx value state = state { stack = newStack }
-    where newStack = listReplaceAt (stack state) (stackAbsIndex relIdx state) value
+    where newStack = (stack state) // [(stackAbsIndex relIdx state, value)]
 
 stackAbsIndex :: Int -> State -> Int
 stackAbsIndex relIdx state = (sp state + relIdx) `mod` stackSize
-
-listReplaceAt :: [a] -> Int -> a -> [a]
-listReplaceAt list idx value = prefix ++ (value:suffix)
-    where (prefix, (_:suffix)) = splitAt idx list
 
 incSP :: Int -> State -> State
 incSP increment state = state { sp = stackAbsIndex increment state }

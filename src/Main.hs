@@ -8,10 +8,10 @@ main :: IO ()
 main = do
     print runResult
 
-vm = VM.VM [ I.loadConst 10
-           , I.loadConst 20
-           , I.loadConst 50
-           , I.end
-           ]
+vm = VM.withCode [ I.loadConst 10
+                 , I.loadConst 20
+                 , I.loadConst 50
+                 , I.end
+                 ]
 
 runResult = VM.State.run 100 $ fromJust $ VM.State.withVM vm
