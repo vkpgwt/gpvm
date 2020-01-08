@@ -1,13 +1,16 @@
 module VM.Image (Image, withVM, step, run) where
+import           Control.Monad.Trans.State.Strict
 import           Data.Array
 import           Data.Int (Int8)
 import           VM
 import qualified VM.Instruction as I
 
-data Image = Image { code :: Code
-                   , stack :: Array Int VM.Word
-                   , sp :: Int
-                   , pc :: Int
+type Stack = Array Int VM.Word
+
+data Image = Image { code  :: !Code
+                   , stack :: !Stack
+                   , sp    :: !Int
+                   , pc    :: !Int
                    } deriving (Show)
 
 data StepResult = StepOk | StepEndInstruction
@@ -27,42 +30,51 @@ withVM (VM code)
                              , pc = 0
                              }
 
-run :: Int -> Image -> (Image, RunResult)
-run maxSteps image
-    | maxSteps <= 0 = (image, RunMaxInstructionsReached)
-    | otherwise     = case stepResult of
-                          StepOk             -> run (maxSteps - 1) newImage
-                          StepEndInstruction -> (newImage, RunEnded)
-    where (newImage, stepResult) = (step image)
+run :: Int -> Image -> (RunResult, Image)
+run maxSteps image = runState (run' maxSteps) image
 
-step :: Image -> (Image, StepResult)
-step image = (transform fs image, result)
-    where (fs, result) = case opcode of
-                             I.LoadConst -> ( [ putToStack 0 (fromIntegral arg)
-                                              , incSP spDelta
-                                              , incPC 1]
-                                            , StepOk)
-                             I.End       -> ([incSP spDelta], StepEndInstruction)
+run' :: Int -> State Image RunResult
+run' maxSteps
+    | maxSteps <= 0 = (return RunMaxInstructionsReached)
+    | otherwise     = step >>= \result ->
+          case result of
+              StepOk             -> run' (maxSteps - 1)
+              StepEndInstruction -> (return RunEnded)
 
-          instruction = code image ! pc image
-          opcode      = I.opcode instruction
-          arg         = fromIntegral (I.arg instruction) :: Int
-          spDelta     = fromIntegral (I.spDelta instruction) :: Int
+step :: State Image StepResult
+step = do
+    instr <- currentInstruction
+    let opcode = I.opcode instr
+        arg = fromIntegral (I.arg instr) :: Int
+        spDelta = fromIntegral (I.spDelta instr) :: Int
+    case opcode of
+        I.LoadConst -> do
+            putToStack 0 arg
+            incSP spDelta
+            incPC 1
+            return StepOk
+        I.End -> do
+            incSP spDelta
+            return StepEndInstruction
 
-transform :: [Image -> Image] -> Image -> Image
-transform fs = foldl (.) id (reverse fs)
+currentInstruction :: State Image I.Instruction
+currentInstruction = do
+    Image { code = code, pc = pc } <- get
+    return $ code ! pc
 
-putToStack :: Int -> VM.Word -> Image -> Image
-putToStack relIdx value image = image { stack = newStack }
-    where newStack = (stack image) // [(stackAbsIndex relIdx image, value)]
+putToStack :: Int -> VM.Word -> State Image ()
+putToStack relIdx value = modify' $ \image ->
+    image { stack = (stack image) // [(stackAbsIndex relIdx image, value)] }
 
 stackAbsIndex :: Int -> Image -> Int
 stackAbsIndex relIdx image = (sp image + relIdx) `mod` stackSize
 
-incSP :: Int -> Image -> Image
-incSP increment image = image { sp = stackAbsIndex increment image }
+incSP :: Int -> State Image ()
+incSP increment = modify' $ \image ->
+    image { sp = stackAbsIndex increment image }
 
-incPC :: Int -> Image -> Image
-incPC increment image = image { pc = (pc image + increment) `mod` codeLength image }
+incPC :: Int -> State Image ()
+incPC increment = modify' $ \image ->
+    image { pc = (pc image + increment) `mod` codeLength image }
 
-codeLength image = length $ code image
+codeLength image = (+1) . snd . bounds $ code image

@@ -11,7 +11,7 @@ main = do
 vm = VM.withCode [ I.loadConst 10
                  , I.loadConst 20
                  , I.loadConst 50
-                 , I.end
+                 --, I.end
                  ]
 
-runResult = VM.Image.run 100 $ fromJust $ VM.Image.withVM vm
+runResult = VM.Image.run 10000000 $ fromJust $ VM.Image.withVM vm
