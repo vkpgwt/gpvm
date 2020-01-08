@@ -2,7 +2,7 @@ module Main (main) where
 import           Data.Maybe (fromJust)
 import qualified VM
 import qualified VM.Instruction as I
-import qualified VM.State
+import qualified VM.Image
 
 main :: IO ()
 main = do
@@ -14,4 +14,4 @@ vm = VM.withCode [ I.loadConst 10
                  , I.end
                  ]
 
-runResult = VM.State.run 100 $ fromJust $ VM.State.withVM vm
+runResult = VM.Image.run 100 $ fromJust $ VM.Image.withVM vm
