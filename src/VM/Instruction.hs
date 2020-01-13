@@ -6,9 +6,9 @@ data OpCode = LoadConst
             | End
             deriving (Enum, Show)
 
-data Instruction = Instruction { opcode :: OpCode
-                               , arg :: Int16
-                               , spDelta :: Int8
+data Instruction = Instruction { opcode  :: !OpCode
+                               , arg     :: !Int16
+                               , spDelta :: !Int8
                                }
 
 instance Show Instruction where

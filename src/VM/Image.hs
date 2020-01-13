@@ -1,11 +1,11 @@
 module VM.Image (Image, withVM, step, run) where
 import           Control.Monad.Trans.State.Strict
-import           Data.Array
+import           Data.Array.Unboxed
 import           Data.Int (Int8)
 import           VM
 import qualified VM.Instruction as I
 
-type Stack = Array Int VM.Word
+type Stack = UArray Int VM.Word
 
 data Image = Image { code  :: !Code
                    , stack :: !Stack

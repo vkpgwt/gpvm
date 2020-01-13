@@ -1,6 +1,7 @@
 module VM where
 import           Data.Array
 import qualified VM.Instruction as I
+import Data.List
 
 type Word = Int
 type Code = Array Int I.Instruction
