@@ -1,4 +1,4 @@
-module VM.Image (Image, withVM, step, run) where
+module VM.Image (Image, withVM, run) where
 import           Control.Monad.Trans.State.Strict
 import           Data.Array.Unboxed
 import           Data.Int (Int8)
