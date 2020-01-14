@@ -5,6 +5,7 @@ import           Data.Int (Int8)
 import           VM
 import qualified VM.Instruction as I
 
+type Code = Array Int I.Instruction
 type Stack = UArray Int VM.Word
 
 data Image = Image { code  :: !Code
@@ -23,8 +24,8 @@ stackSize = 16
 
 withVM :: VM -> Maybe Image
 withVM (VM code)
-    | null (assocs code) = Nothing
-    | otherwise = Just Image { code = code
+    | null code = Nothing
+    | otherwise = Just Image { code = listArray (0, length code - 1) code
                              , stack = listArray (0, stackSize-1) (repeat 0)
                              , sp = 0
                              , pc = 0
