@@ -1,7 +1,9 @@
-module VM.Image (Image, withVM, run) where
+module VM.Image (
+    Image, RunResult,
+    withVM, run
+    ) where
 import           Control.Monad.Trans.State.Strict
 import           Data.Array.Unboxed
-import           Data.Int (Int8)
 import           VM
 import qualified VM.Instruction as I
 
@@ -20,6 +22,7 @@ data StepResult = StepOk | StepEndInstruction
 data RunResult = RunEnded | RunMaxInstructionsReached
                  deriving (Show)
 
+stackSize :: Int
 stackSize = 16
 
 withVM :: VM -> Maybe Image
@@ -78,4 +81,5 @@ incPC :: Int -> State Image ()
 incPC increment = modify' $ \image ->
     image { pc = (pc image + increment) `mod` codeLength image }
 
+codeLength :: Image -> Int
 codeLength image = (+1) . snd . bounds $ code image

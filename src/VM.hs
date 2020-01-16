@@ -1,6 +1,5 @@
 module VM where
 import qualified VM.Instruction as I
-import Data.List
 
 type Word = Int
 

@@ -26,11 +26,12 @@ instance Show Instruction where
             spDeltaSuffix
                 | spDelta == 0    = "K"
                 | spDelta == 1    = "F"
-                | spDelta >  1    = "F" ++ show spDelta
                 | spDelta == (-1) = "P"
-                | spDelta <  (-1) = "P" ++ show (negate spDelta)
+                | spDelta >  1    = "F" ++ show spDelta
+                | otherwise       = "P" ++ show (negate spDelta)
 
 loadConst :: Int16 -> Instruction
 loadConst arg = Instruction LoadConst arg 1
 
+end :: Instruction
 end = Instruction End 0 0

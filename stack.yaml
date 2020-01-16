@@ -65,4 +65,4 @@ packages:
 # Allow a newer minor version of GHC than the snapshot specifies
 # compiler-check: newer-minor
 ghc-options:
-  "$everything": -j8 -O2 -ddump-simpl -dsuppress-all -dsuppress-uniques
+  "$everything": -Wall -Wno-name-shadowing -j8 -O2 -rtsopts # -ddump-simpl -dsuppress-all -dsuppress-uniques
