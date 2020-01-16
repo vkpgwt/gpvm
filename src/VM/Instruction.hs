@@ -1,4 +1,8 @@
-module VM.Instruction where
+module VM.Instruction (
+    Instruction, OpCode(..),
+    opcode, arg, spDelta,
+    loadConst, end
+    ) where
 import Data.Int (Int16, Int8)
 import Data.List (intercalate)
 
