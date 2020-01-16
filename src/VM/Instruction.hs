@@ -10,13 +10,19 @@ data OpCode = LoadConst
             | End
             deriving (Enum, Show)
 
-data Instruction = Instruction { opcode  :: !OpCode
-                               , arg     :: !Int16
-                               , spDelta :: !Int8
+data Instruction = Instruction { opcode    :: !OpCode
+                               , inArg     :: !Int16
+                               , inSpDelta :: !Int8
                                }
 
+arg :: Instruction -> Int
+arg = fromIntegral . inArg
+
+spDelta :: Instruction -> Int
+spDelta = fromIntegral . inSpDelta
+
 instance Show Instruction where
-    show (Instruction { opcode = opcode, arg = arg, spDelta = spDelta })
+    show (Instruction { opcode = opcode, inArg = arg, inSpDelta = spDelta })
         = intercalate " " $ [opcodeString] ++ argComponents
         where
             argComponents = case opcode of

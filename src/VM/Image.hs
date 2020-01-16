@@ -49,8 +49,8 @@ step :: State Image StepResult
 step = do
     instr <- currentInstruction
     let opcode = I.opcode instr
-        arg = fromIntegral (I.arg instr) :: Int
-        spDelta = fromIntegral (I.spDelta instr) :: Int
+        arg = I.arg instr
+        spDelta = I.spDelta instr
     case opcode of
         I.LoadConst -> do
             putToStack 0 arg
