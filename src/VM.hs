@@ -2,19 +2,28 @@ module VM (
     VM, RunResult,
     withCode, run
     ) where
-import           Control.Monad.Trans.State.Strict
-import           Data.Array.Unboxed
+import           Control.Monad.ST
+import           Data.STRef
+import           Data.Array
+import           Data.Array.ST.Safe
 import qualified VM.Instruction as I
 
 type Word = Int
-type Code = Array Int I.Instruction
-type Stack = UArray Int VM.Word
 
-data VM = VM { code  :: !Code
-             , stack :: !Stack
-             , sp    :: !Int
-             , pc    :: !Int
-             } deriving (Show)
+data VM = VM {
+    code  :: !(Array Int I.Instruction),
+    stack :: !(Array Int VM.Word),
+    sp    :: !Int,
+    pc    :: !Int
+    } deriving (Show)
+
+data MutVM s = MutVM {
+    mutCode    :: !(Array Int I.Instruction),
+    mutCodeLen :: !Int,
+    mutStack   :: !(STUArray s Int VM.Word),
+    mutSP      :: !(STRef s Int),
+    mutPC      :: !(STRef s Int)
+    }
 
 data StepResult = StepOk | StepEndInstruction
                   deriving (Show)
@@ -35,51 +44,79 @@ withCode code
                           }
 
 run :: Int -> VM -> (RunResult, VM)
-run maxSteps vm = runState (run' maxSteps) vm
+run maxSteps vm = runST $ do
+    mutVM <- thawVM vm
+    result <- runMutVM maxSteps mutVM
+    newVM <- freezeVM mutVM
+    return (result, newVM)
 
-run' :: Int -> State VM RunResult
-run' maxSteps
-    | maxSteps <= 0 = (return RunMaxInstructionsReached)
-    | otherwise     = step >>= \result ->
+thawVM :: VM -> ST s (MutVM s)
+thawVM vm = do
+    mutStack <- thaw $ stack vm
+    spRef    <- newSTRef $ sp vm
+    pcRef    <- newSTRef $ pc vm
+    return MutVM {
+        mutCode    = code vm,
+        mutCodeLen = (+1) . snd . bounds . code $ vm,
+        mutStack   = mutStack,
+        mutSP      = spRef,
+        mutPC      = pcRef
+        }
+
+freezeVM :: MutVM s -> ST s VM
+freezeVM mutVM = do
+    stack <- freeze $ mutStack mutVM
+    sp    <- readSTRef $ mutSP mutVM
+    pc    <- readSTRef $ mutPC mutVM
+    return VM {
+        code = mutCode mutVM,
+        stack = stack,
+        sp = sp,
+        pc = pc
+        }
+
+runMutVM :: Int -> MutVM s -> ST s RunResult
+runMutVM maxSteps mutVM
+    | maxSteps <= 0 = return RunMaxInstructionsReached
+    | otherwise = do
+          result <- step mutVM
           case result of
-              StepOk             -> run' (maxSteps - 1)
-              StepEndInstruction -> (return RunEnded)
+              StepOk             -> runMutVM (maxSteps - 1) mutVM
+              StepEndInstruction -> return RunEnded
 
-step :: State VM StepResult
-step = do
-    instr <- currentInstruction
+step :: MutVM s -> ST s StepResult
+step vm = do
+    instr <- currentInstruction vm
+
     let opcode = I.opcode instr
         arg = I.arg instr
         spDelta = I.spDelta instr
+
     case opcode of
         I.LoadConst -> do
-            putToStack 0 arg
-            incSP spDelta
-            incPC 1
+            putToStack 0 arg vm
+            incSP spDelta vm
+            incPC 1 vm
             return StepOk
         I.End -> do
-            incSP spDelta
+            incSP spDelta vm
             return StepEndInstruction
 
-currentInstruction :: State VM I.Instruction
-currentInstruction = do
-    VM { code = code, pc = pc } <- get
-    return $ code ! pc
+currentInstruction :: MutVM s -> ST s I.Instruction
+currentInstruction vm = do
+    pc <- readSTRef $ mutPC vm
+    return $ mutCode vm ! pc
 
-putToStack :: Int -> VM.Word -> State VM ()
-putToStack relIdx value = modify' $ \vm ->
-    vm { stack = (stack vm) // [(stackAbsIndex relIdx vm, value)] }
+putToStack :: Int -> VM.Word -> MutVM s -> ST s ()
+putToStack relIdx value vm = do
+    sp <- readSTRef $ mutSP vm
+    writeArray (mutStack vm) (stackAbsIndex relIdx sp) value
 
-stackAbsIndex :: Int -> VM -> Int
-stackAbsIndex relIdx vm = (sp vm + relIdx) `mod` stackSize
+stackAbsIndex :: Int -> Int -> Int
+stackAbsIndex relIdx sp = (sp + relIdx) `mod` stackSize
 
-incSP :: Int -> State VM ()
-incSP increment = modify' $ \vm ->
-    vm { sp = stackAbsIndex increment vm }
+incSP :: Int -> MutVM s -> ST s ()
+incSP increment vm = modifySTRef' (mutSP vm) (stackAbsIndex increment)
 
-incPC :: Int -> State VM ()
-incPC increment = modify' $ \vm ->
-    vm { pc = (pc vm + increment) `mod` codeLength vm }
-
-codeLength :: VM -> Int
-codeLength vm = (+1) . snd . bounds $ code vm
+incPC :: Int -> MutVM s -> ST s ()
+incPC increment vm = modifySTRef' (mutPC vm) $ \pc -> (pc + increment) `mod` mutCodeLen vm
