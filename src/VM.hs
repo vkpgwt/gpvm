@@ -119,4 +119,11 @@ incSP :: Int -> MutVM s -> ST s ()
 incSP increment vm = modifySTRef' (mutSP vm) (stackAbsIndex increment)
 
 incPC :: Int -> MutVM s -> ST s ()
-incPC increment vm = modifySTRef' (mutPC vm) $ \pc -> (pc + increment) `mod` mutCodeLen vm
+incPC increment vm = modifySTRef' (mutPC vm) transform
+    where transform pc
+              | increment >= 0 && increment <= codeLen =
+                if increment + pc >= codeLen
+                then increment + pc - codeLen
+                else increment + pc
+              | otherwise = (increment + pc) `mod` codeLen
+          codeLen = mutCodeLen vm
