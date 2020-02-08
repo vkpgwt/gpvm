@@ -10,9 +10,9 @@ data OpCode = LoadConst
             | End
             deriving (Enum, Show)
 
-data Instruction = Instruction { opcode    :: !OpCode
-                               , inArg     :: !Int16
-                               , inSpDelta :: !Int8
+data Instruction = Instruction { opcode    ::                !OpCode
+                               , inArg     :: {-# UNPACK #-} !Int16
+                               , inSpDelta :: {-# UNPACK #-} !Int8
                                }
 
 arg :: Instruction -> Int

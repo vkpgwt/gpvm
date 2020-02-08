@@ -18,11 +18,11 @@ data VM = VM {
     } deriving (Show)
 
 data MutVM s = MutVM {
-    mutCode    :: !(Array Int I.Instruction),
-    mutCodeLen :: !Int,
-    mutStack   :: !(STUArray s Int VM.Word),
-    mutSP      :: !(STRef s Int),
-    mutPC      :: !(STRef s Int)
+    mutCode    :: {-# UNPACK #-} !(Array Int I.Instruction),
+    mutCodeLen :: {-# UNPACK #-} !Int,
+    mutStack   :: {-# UNPACK #-} !(STUArray s Int VM.Word),
+    mutSP      :: {-# UNPACK #-} !(STRef s Int),
+    mutPC      :: {-# UNPACK #-} !(STRef s Int)
     }
 
 data StepResult = StepOk | StepEndInstruction
