@@ -15,4 +15,4 @@ code = [ I.loadConst 10
        ]
 
 runResult :: (VM.RunResult, VM.VM)
-runResult = VM.run 100000000 $ fromJust $ VM.withCode code
+runResult = VM.run 500000000 $ fromJust $ VM.withCode code
