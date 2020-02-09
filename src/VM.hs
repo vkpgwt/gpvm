@@ -5,7 +5,7 @@ module VM (
 import           Control.Monad.ST
 import           Data.STRef
 import           Data.Vector.Unboxed.Mutable (MVector)
-import           Data.Vector (Vector, (!))
+import           Data.Vector (Vector)
 import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Generic.Mutable as MV
 import qualified VM.Instruction as I
@@ -107,12 +107,12 @@ step vm = do
 currentInstruction :: MutVM s -> ST s I.Instruction
 currentInstruction vm = do
     pc <- readSTRef $ mutPC vm
-    return $ mutCode vm ! pc
+    return $ mutCode vm `V.unsafeIndex` pc
 
 putToStack :: Int -> VM.Word -> MutVM s -> ST s ()
 putToStack relIdx value vm = do
     sp <- readSTRef $ mutSP vm
-    MV.write (mutStack vm) (stackAbsIndex relIdx sp) value
+    MV.unsafeWrite (mutStack vm) (stackAbsIndex relIdx sp) value
 
 stackAbsIndex :: Int -> Int -> Int
 stackAbsIndex relIdx sp = (sp + relIdx) `mod` stackSize
