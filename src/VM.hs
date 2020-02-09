@@ -4,23 +4,25 @@ module VM (
     ) where
 import           Control.Monad.ST
 import           Data.STRef
-import           Data.Array
-import           Data.Array.ST.Safe
+import           Data.Vector.Unboxed.Mutable (MVector)
+import           Data.Vector (Vector, (!))
+import qualified Data.Vector.Generic as V
+import qualified Data.Vector.Generic.Mutable as MV
 import qualified VM.Instruction as I
 
 type Word = Int
 
 data VM = VM {
-    code  :: !(Array Int I.Instruction),
-    stack :: !(Array Int VM.Word),
+    code  :: ![I.Instruction],
+    stack :: ![VM.Word],
     sp    :: !Int,
     pc    :: !Int
     } deriving (Show)
 
 data MutVM s = MutVM {
-    mutCode    :: {-# UNPACK #-} !(Array Int I.Instruction),
+    mutCode    :: {-# UNPACK #-} !(Vector I.Instruction),
     mutCodeLen :: {-# UNPACK #-} !Int,
-    mutStack   :: {-# UNPACK #-} !(STUArray s Int VM.Word),
+    mutStack   :: {-# UNPACK #-} !(MVector s VM.Word),
     mutSP      :: {-# UNPACK #-} !(STRef s Int),
     mutPC      :: {-# UNPACK #-} !(STRef s Int)
     }
@@ -37,8 +39,8 @@ stackSize = 16
 withCode :: [I.Instruction] -> Maybe VM
 withCode code
     | null code = Nothing
-    | otherwise = Just VM { code = listArray (0, length code - 1) code
-                          , stack = listArray (0, stackSize-1) (repeat 0)
+    | otherwise = Just VM { code = code
+                          , stack = replicate stackSize 0
                           , sp = 0
                           , pc = 0
                           }
@@ -52,12 +54,12 @@ run maxSteps vm = runST $ do
 
 thawVM :: VM -> ST s (MutVM s)
 thawVM vm = do
-    mutStack <- thaw $ stack vm
+    mutStack <- V.thaw . V.fromList $ stack vm
     spRef    <- newSTRef $ sp vm
     pcRef    <- newSTRef $ pc vm
     return MutVM {
-        mutCode    = code vm,
-        mutCodeLen = (+1) . snd . bounds . code $ vm,
+        mutCode    = V.fromList $ code vm,
+        mutCodeLen = length $ code vm,
         mutStack   = mutStack,
         mutSP      = spRef,
         mutPC      = pcRef
@@ -65,12 +67,12 @@ thawVM vm = do
 
 freezeVM :: MutVM s -> ST s VM
 freezeVM mutVM = do
-    stack <- freeze $ mutStack mutVM
+    stack <- V.freeze $ mutStack mutVM
     sp    <- readSTRef $ mutSP mutVM
     pc    <- readSTRef $ mutPC mutVM
     return VM {
-        code = mutCode mutVM,
-        stack = stack,
+        code = V.toList $ mutCode mutVM,
+        stack = V.toList stack,
         sp = sp,
         pc = pc
         }
@@ -110,7 +112,7 @@ currentInstruction vm = do
 putToStack :: Int -> VM.Word -> MutVM s -> ST s ()
 putToStack relIdx value vm = do
     sp <- readSTRef $ mutSP vm
-    writeArray (mutStack vm) (stackAbsIndex relIdx sp) value
+    MV.write (mutStack vm) (stackAbsIndex relIdx sp) value
 
 stackAbsIndex :: Int -> Int -> Int
 stackAbsIndex relIdx sp = (sp + relIdx) `mod` stackSize
