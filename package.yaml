@@ -13,9 +13,9 @@ extra-source-files:
 
 dependencies:
   - base >= 4.7 && < 5
-  - array >= 0.5
   - transformers >= 0.5
   - vector >= 0.0
+  - random
   - criterion
 
 ghc-options:
