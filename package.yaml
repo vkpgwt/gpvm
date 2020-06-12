@@ -16,6 +16,7 @@ dependencies:
   - transformers >= 0.5
   - vector >= 0.0
   - random
+  - mtl
   - criterion
 
 ghc-options:
