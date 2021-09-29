@@ -15,8 +15,24 @@ dependencies:
   - base >= 4.7 && < 5
   - array >= 0.5
   - transformers >= 0.5
+  - criterion
+
+ghc-options:
+  - -O2
+
+library:
+  source-dirs: src
 
 executables:
-  gpvm:
-    source-dirs:      src
+  gpvm-exe:
+    source-dirs:      app
     main:             Main.hs
+    dependencies:
+      - gpvm
+
+benchmarks:
+  gpvm-bench:
+    source-dirs: bench
+    main: Main.hs
+    dependencies:
+      - gpvm
