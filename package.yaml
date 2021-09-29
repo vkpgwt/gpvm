@@ -25,6 +25,11 @@ ghc-options:
 library:
   source-dirs: src
 
+default-extensions:
+  - PatternSynonyms
+  - ViewPatterns
+  - TypeApplications
+
 executables:
   gpvm-exe:
     source-dirs:      app

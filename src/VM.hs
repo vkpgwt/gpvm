@@ -12,9 +12,11 @@ import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.ST
 import Control.Monad.State
+import Data.Int
 import Data.Vector (Vector)
 import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Generic.Mutable as MV
+import qualified Data.Vector.Unboxed as UV
 import Data.Vector.Unboxed.Mutable (MVector)
 import qualified VM.Instruction as I
 
@@ -28,10 +30,10 @@ data VM = VM
   }
   deriving (Show)
 
-type Run s a = (ReaderT (ROData s) (StateT MutData (ST s)) a)
+type Run s a = ReaderT (ROData s) (StateT MutData (ST s)) a
 
 data ROData s = ROData
-  { roCode :: {-# UNPACK #-} !(Vector I.Instruction),
+  { roCode :: {-# UNPACK #-} !(UV.Vector Int16),
     roCodeLen :: {-# UNPACK #-} !Int,
     roStack :: {-# UNPACK #-} !(MVector s VM.Word)
   }
@@ -73,7 +75,7 @@ withVM vm action = runST $ do
   stack <- V.thaw . V.fromList $ stack vm
   let roData =
         ROData
-          { roCode = V.fromList $ code vm,
+          { roCode = V.fromList . map I.getInstruction $ code vm,
             roCodeLen = length $ code vm,
             roStack = stack
           }
@@ -91,7 +93,7 @@ freezeVM = do
   stack <- V.freeze $ roStack roData
   return
     VM
-      { code = V.toList $ roCode roData,
+      { code = map I.Instruction . V.toList $ roCode roData,
         stack = V.toList stack,
         sp = mutSP mutData,
         pc = mutPC mutData
@@ -114,16 +116,18 @@ step = do
       arg = I.arg instr
 
   case opcode of
-    I.LoadConst -> do
+    I.OpCode I.LoadConst -> do
       putToStack 0 arg
       incSP 1
       incPC 1
       return StepOk
-    I.End -> do
+    I.OpCode I.End ->
       return StepEndInstruction
+    _ ->
+      pure StepOk
 
 currentInstruction :: Run s I.Instruction
-currentInstruction = liftA2 V.unsafeIndex (asks roCode) (gets mutPC)
+currentInstruction = asks ((I.Instruction .) . V.unsafeIndex . roCode) <*> gets mutPC
 
 putToStack :: Int -> VM.Word -> Run s ()
 putToStack relIdx value = do
