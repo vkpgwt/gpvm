@@ -112,16 +112,14 @@ step = do
 
   let opcode = I.opcode instr
       arg = I.arg instr
-      spDelta = I.spDelta instr
 
   case opcode of
     I.LoadConst -> do
       putToStack 0 arg
-      incSP spDelta
+      incSP 1
       incPC 1
       return StepOk
     I.End -> do
-      incSP spDelta
       return StepEndInstruction
 
 currentInstruction :: Run s I.Instruction
