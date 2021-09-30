@@ -29,6 +29,16 @@ default-extensions:
   - PatternSynonyms
   - ViewPatterns
   - TypeApplications
+  - DataKinds
+  - ConstraintKinds
+  - MultiParamTypeClasses
+  - TypeFamilies
+  - ScopedTypeVariables
+  - FlexibleInstances
+  - OverloadedLabels
+  - RankNTypes
+  - NamedFieldPuns
+  - RecordWildCards
 
 executables:
   gpvm-exe:

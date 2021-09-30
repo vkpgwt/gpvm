@@ -5,14 +5,12 @@ module Selectable
     breedIntWithRange,
   )
 where
+import System.Random (RandomGen, randomR, StdGen)
 
-import System.Random (RandomGen, randomR)
-
--- | Сущность, подлежащая отбору. Для нее определена функция порождения мутантной
--- | копии и функция вычисления приспособленности.
-class Selectable s where
-  breed :: RandomGen g => s -> g -> (s, g)
-  fitness :: s -> Fitness
+data Selectable = Selectable
+  { breed :: StdGen -> (Selectable, StdGen),
+    fitness :: Fitness
+  }
 
 -- | Значение функции приспособленности: больше - приспособленнее
 type Fitness = Double

@@ -1,64 +1,67 @@
-{-# LANGUAGE StandaloneDeriving #-}
-
 module SelectionEngine
   ( select,
   )
 where
 
 import qualified Control.Monad.Trans.State.Strict as S
-import Data.List (sortBy)
+import Data.List (sortBy, sortOn)
 import Data.Ord (Down (..), comparing)
-import Selectable (Selectable)
-import qualified Selectable as Sel
+import Selectable hiding (spawnOne)
 import System.Random (StdGen, mkStdGen)
+import Control.Monad
+import Records
 
-data Engine s = Engine
-  { engSelectedItems :: [(s, Sel.Fitness)],
-    engRandomGen :: !StdGen
+data SelectionEngine = SelectionEngine
+  { selectables :: [Selectable],
+    gen :: !StdGen,
+    config :: Config
   }
 
-deriving instance (Show s) => Show (Engine s)
+data Config = Config
+  { fertility :: !Int,
+    maxPopulation :: !Int
+  }
 
-type MyState s a = S.State (Engine s) a
-
-maxItems, randomSeed, fertility :: Int
-maxItems = 10
-randomSeed = 0
-fertility = 1
-
--- | Выполнение заданного числа итераций отбора
-select :: (Selectable s) => Int -> [s] -> [(s, Sel.Fitness)]
-select num = engSelectedItems . S.execState monad . new
-  where
-    monad = sequence_ (replicate num generation)
-
--- | Инициализация заданными данными
-new :: (Selectable s) => [s] -> Engine s
-new sels =
-  Engine
-    { engSelectedItems = map makeItem sels,
-      engRandomGen = mkStdGen randomSeed
+defaultConfig :: Config
+defaultConfig =
+  Config
+    { fertility = 1,
+      maxPopulation = 10
     }
 
-makeItem :: (Selectable s) => s -> (s, Sel.Fitness)
-makeItem s = s `seq` f `seq` (s, f)
-  where
-    f = Sel.fitness s
+type State a = S.State SelectionEngine a
+
+-- | Выполнение заданного числа итераций отбора
+select :: Int -> SelectionEngine -> SelectionEngine
+select steps = S.execState (replicateM_ steps doSelectionStep)
+
+-- | Инициализация заданными данными
+new :: [Selectable] -> Int -> SelectionEngine
+new sels randomSeed =
+  SelectionEngine
+    { selectables = sels,
+      gen = mkStdGen randomSeed,
+      config = defaultConfig
+    }
 
 -- | Одна итерация отбора
-generation :: Selectable s => MyState s ()
-generation = do
-  items <- S.gets engSelectedItems
-  allChildren <- concat <$> mapM (makeChildrenOf fertility . fst) items
-  let bestItems = take maxItems . sortBy (comparing (Down . snd)) $ items ++ allChildren
-  S.modify' $ \e -> e {engSelectedItems = bestItems}
+doSelectionStep :: State ()
+doSelectionStep = do
+  conf <- S.gets config
+  parents <- S.gets selectables
+  allChildren <- concat <$> mapM (spawnMany $ conf ^. #fertility) parents
+  let bestSelectables =
+        take (conf ^. #maxPopulation)
+          . sortOn (Down . (^. #fitness))
+          $ parents ++ allChildren
+  S.modify' $ \e -> e {selectables = bestSelectables}
 
-makeChildrenOf :: Selectable s => Int -> s -> MyState s [(s, Sel.Fitness)]
-makeChildrenOf num = sequence . replicate num . breed
+spawnMany :: Int -> Selectable -> State [Selectable]
+spawnMany num = replicateM num . spawnOne
 
-breed :: (Selectable s) => s -> MyState s (s, Sel.Fitness)
-breed s = do
-  g <- S.gets engRandomGen
-  let (child, g') = Sel.breed s g
-  S.modify' $ \e -> e {engRandomGen = g'}
-  return $ makeItem child
+spawnOne :: Selectable -> State Selectable
+spawnOne s = do
+  g <- S.gets gen
+  let (child, g') = (s ^. #breed) g
+  S.modify' $ \e -> e {gen = g'}
+  pure child
