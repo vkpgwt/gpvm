@@ -16,5 +16,5 @@ code =
     --, I.end
   ]
 
-runResult :: (VM.RunResult, VM.VM)
-runResult = VM.run 500000000 $ fromJust $ VM.mkWithCode code
+runResult :: (VM.RunResult, VM.Snapshot)
+runResult = VM.run 500000000 $ fromJust $ VM.mkSnapshot $ VM.VM { code, stackSize = 16 }

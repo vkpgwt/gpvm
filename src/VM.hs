@@ -1,9 +1,10 @@
 {-# LANGUAGE RankNTypes #-}
 
 module VM
-  ( VM,
+  ( VM (..),
+    Snapshot,
     RunResult,
-    mkWithCode,
+    mkSnapshot,
     run,
   )
 where
@@ -18,12 +19,18 @@ import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Generic.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 import Data.Vector.Unboxed.Mutable (MVector)
+import Records
 import qualified VM.Instruction as I
 
 -- | The machine word
 type W = Int
 
 data VM = VM
+  { code :: ![I.Instruction],
+    stackSize :: !Int
+  }
+
+data Snapshot = Snapshot
   { code :: ![I.Instruction],
     stack :: ![W],
     sp :: !Int,
@@ -50,34 +57,31 @@ data StepResult = StepOk | StepEndInstruction
 data RunResult = RunEnded | RunMaxInstructionsReached
   deriving (Show)
 
-defaultStackSize :: Int
-defaultStackSize = 16
-
-mkWithCode :: [I.Instruction] -> Maybe VM
-mkWithCode code
-  | null code = Nothing
+mkSnapshot :: VM -> Maybe Snapshot
+mkSnapshot vm
+  | null $ vm ^. #code = Nothing
   | otherwise =
     Just
-      VM
-        { code = code,
-          stack = replicate defaultStackSize 0,
+      Snapshot
+        { code = vm ^. #code,
+          stack = replicate (vm ^. #stackSize) 0,
           sp = 0,
           pc = 0
         }
 
-run :: Int -> VM -> (RunResult, VM)
+run :: Int -> Snapshot -> (RunResult, Snapshot)
 run maxSteps vm = withMutVM vm $ do
   result <- runMut maxSteps
   vm' <- freezeVM
   return (result, vm')
 
-withMutVM :: VM -> (forall s. Run s a) -> a
+withMutVM :: Snapshot -> (forall s. Run s a) -> a
 withMutVM vm action = runST $ do
   stack <- V.thaw . V.fromList $ stack vm
   let roData =
         ROData
-          { roCode = V.fromList . map I.getInstruction $ code vm,
-            roCodeLen = length $ code vm,
+          { roCode = V.fromList . map I.getInstruction $ vm ^. #code,
+            roCodeLen = length $ vm ^. #code,
             roStack = stack
           }
       mutData =
@@ -87,13 +91,13 @@ withMutVM vm action = runST $ do
           }
   evalStateT (runReaderT action roData) mutData
 
-freezeVM :: Run s VM
+freezeVM :: Run s Snapshot
 freezeVM = do
   roData <- ask
   mutData <- get
   stack <- V.freeze $ roStack roData
   return
-    VM
+    Snapshot
       { code = map I.Instruction . V.toList $ roCode roData,
         stack = V.toList stack,
         sp = mutSP mutData,
@@ -134,13 +138,20 @@ putToStack :: Int -> W -> Run s ()
 putToStack relIdx value = do
   sp <- gets mutSP
   stack <- asks roStack
-  MV.unsafeWrite stack (stackAbsIndex relIdx sp) value
+  addr <- getStackAddr relIdx
+  MV.unsafeWrite stack addr value
 
-stackAbsIndex :: Int -> Int -> Int
-stackAbsIndex relIdx sp = (sp + relIdx) `mod` defaultStackSize
+-- NB: may be slow
+getStackAddr :: Int -> Run s Int
+getStackAddr relIdx = do
+  len <- asks (MV.length . roStack)
+  sp <- gets mutSP
+  pure $ (sp + relIdx) `mod` len
 
 incSP :: Int -> Run s ()
-incSP increment = modify' $ \s -> s {mutSP = stackAbsIndex increment (mutSP s)}
+incSP increment = do
+  newValue <- getStackAddr increment
+  modify' $ \s -> s {mutSP = newValue}
 
 incPC :: Int -> Run s ()
 incPC increment = do

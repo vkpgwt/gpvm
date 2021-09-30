@@ -39,6 +39,7 @@ default-extensions:
   - RankNTypes
   - NamedFieldPuns
   - RecordWildCards
+  - DuplicateRecordFields
 
 executables:
   gpvm-exe:

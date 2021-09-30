@@ -15,7 +15,13 @@ main =
   defaultMain
     [ bgroup
         "VM.run"
-        [ bench "LoadConst" $ whnf (VM.run 1000000) $ fromJust $ VM.mkWithCode code
+        [ bench "LoadConst" $
+            whnf (VM.run 1000000) $
+              fromJust . VM.mkSnapshot $
+                VM.VM
+                  { code = code,
+                    stackSize = 16
+                  }
         ]
     ]
 
