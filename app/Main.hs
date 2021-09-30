@@ -1,6 +1,7 @@
 module Main (main) where
 
 import Data.Maybe (fromJust)
+import qualified Data.Vector as V
 import qualified VM
 import qualified VM.Instruction as I
 
@@ -8,7 +9,7 @@ main :: IO ()
 main = do
   print runResult
 
-code :: [I.Instruction]
+code :: V.Vector I.Instruction
 code =
   [ I.loadConst 10,
     I.loadConst 20,
@@ -17,4 +18,4 @@ code =
   ]
 
 runResult :: (VM.RunResult, VM.Snapshot)
-runResult = VM.run 500000000 $ fromJust $ VM.mkSnapshot $ VM.VM { code, stackSize = 16 }
+runResult = VM.run 500000000 $ fromJust $ VM.mkSnapshot $ VM.VM {code, stackSize = 16}

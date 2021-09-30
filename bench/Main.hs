@@ -7,6 +7,7 @@ import Control.Applicative
 import Criterion.Main
 import Data.List
 import Data.Maybe
+import qualified Data.Vector as V
 import qualified VM
 import qualified VM.Instruction as I
 
@@ -25,7 +26,7 @@ main =
         ]
     ]
 
-code :: [I.Instruction]
+code :: V.Vector I.Instruction
 code =
   [ I.loadConst 10,
     I.loadConst 20,

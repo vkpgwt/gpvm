@@ -40,6 +40,7 @@ default-extensions:
   - NamedFieldPuns
   - RecordWildCards
   - DuplicateRecordFields
+  - OverloadedLists
 
 executables:
   gpvm-exe:

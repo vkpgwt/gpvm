@@ -15,6 +15,7 @@ import Control.Monad.ST
 import Control.Monad.State
 import Data.Int
 import Data.Vector (Vector)
+import qualified Data.Vector as BV
 import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Generic.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
@@ -26,12 +27,12 @@ import qualified VM.Instruction as I
 type W = Int
 
 data VM = VM
-  { code :: ![I.Instruction],
+  { code :: !(BV.Vector I.Instruction),
     stackSize :: !Int
   }
 
 data Snapshot = Snapshot
-  { code :: ![I.Instruction],
+  { code :: !(BV.Vector I.Instruction),
     stack :: ![W],
     sp :: !Int,
     pc :: !Int
@@ -80,7 +81,7 @@ withMutVM vm action = runST $ do
   stack <- V.thaw . V.fromList $ stack vm
   let roData =
         ROData
-          { roCode = V.fromList . map I.getInstruction $ vm ^. #code,
+          { roCode = V.convert . fmap I.getInstruction $ vm ^. #code,
             roCodeLen = length $ vm ^. #code,
             roStack = stack
           }
@@ -98,7 +99,7 @@ freezeVM = do
   stack <- V.freeze $ roStack roData
   return
     Snapshot
-      { code = map I.Instruction . V.toList $ roCode roData,
+      { code = fmap I.Instruction . V.convert $ roCode roData,
         stack = V.toList stack,
         sp = mutSP mutData,
         pc = mutPC mutData
