@@ -21,8 +21,14 @@ data OpCodeName
 
 newtype OpCode = OpCodeRaw {getOpCode :: Int}
 
+-- todo: may be slow
 pattern OpCode :: OpCodeName -> OpCode
-pattern OpCode e <- OpCodeRaw (toEnum @OpCodeName -> e)
+pattern OpCode e <- OpCodeRaw (mbToEnum @OpCodeName -> Just e)
+
+mbToEnum :: forall e. (Enum e, Bounded e) => Int -> Maybe e
+mbToEnum x
+  | x >= fromEnum (minBound @e) && x <= fromEnum (maxBound @e) = Just $ toEnum x
+  | otherwise = Nothing
 
 newtype Instruction = Instruction {getInstruction :: Int16}
 

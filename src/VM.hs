@@ -5,6 +5,7 @@ module VM
     Snapshot,
     RunResult,
     mkSnapshot,
+    snapshotStackIndex,
     run,
   )
 where
@@ -23,17 +24,18 @@ import Data.Vector.Unboxed.Mutable (MVector)
 import Records
 import qualified VM.Instruction as I
 
--- | The machine word
+-- | The machine data word
 type W = Int
 
 data VM = VM
   { code :: !(BV.Vector I.Instruction),
     stackSize :: !Int
   }
+  deriving Show
 
 data Snapshot = Snapshot
   { code :: !(BV.Vector I.Instruction),
-    stack :: ![W],
+    stack :: !(UV.Vector W),
     sp :: !Int,
     pc :: !Int
   }
@@ -65,10 +67,14 @@ mkSnapshot vm
     Just
       Snapshot
         { code = vm ^. #code,
-          stack = replicate (vm ^. #stackSize) 0,
+          stack = V.replicate (vm ^. #stackSize) 0,
           sp = 0,
           pc = 0
         }
+
+snapshotStackIndex :: Int -> Snapshot -> Maybe W
+snapshotStackIndex relIdx Snapshot{stack, sp} =
+  stack V.!? ((sp + relIdx) `mod` V.length stack)
 
 run :: Int -> Snapshot -> (RunResult, Snapshot)
 run maxSteps vm = withMutVM vm $ do
@@ -78,7 +84,7 @@ run maxSteps vm = withMutVM vm $ do
 
 withMutVM :: Snapshot -> (forall s. Run s a) -> a
 withMutVM vm action = runST $ do
-  stack <- V.thaw . V.fromList $ stack vm
+  stack <- V.thaw $ stack vm
   let roData =
         ROData
           { roCode = V.convert . fmap I.getInstruction $ vm ^. #code,
@@ -100,7 +106,7 @@ freezeVM = do
   return
     Snapshot
       { code = fmap I.Instruction . V.convert $ roCode roData,
-        stack = V.toList stack,
+        stack = stack,
         sp = mutSP mutData,
         pc = mutPC mutData
       }

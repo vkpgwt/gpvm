@@ -2,20 +2,16 @@ module Main (main) where
 
 import Data.Maybe (fromJust)
 import qualified Data.Vector as V
+import qualified SelectionEngine
 import qualified VM
+import qualified VM.Breeding
 import qualified VM.Instruction as I
 
 main :: IO ()
 main = do
-  print runResult
+  let e0 = SelectionEngine.new [VM.Breeding.mkSelectable $ VM.VM {code, stackSize = 16}] 0
+  let e1 = SelectionEngine.run 5 e0
+  print e1
 
 code :: V.Vector I.Instruction
-code =
-  [ I.loadConst 10,
-    I.loadConst 20,
-    I.loadConst 50
-    --, I.end
-  ]
-
-runResult :: (VM.RunResult, VM.Snapshot)
-runResult = VM.run 500000000 $ fromJust $ VM.mkSnapshot $ VM.VM {code, stackSize = 16}
+code = [I.loadConst 10]

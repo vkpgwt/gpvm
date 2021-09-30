@@ -5,12 +5,19 @@ module Selectable
     breedIntWithRange,
   )
 where
-import System.Random (RandomGen, randomR, StdGen)
+
+import Records
+import System.Random (RandomGen, StdGen, randomR)
+import System.Random.Stateful
 
 data Selectable = Selectable
-  { breed :: StdGen -> (Selectable, StdGen),
-    fitness :: Fitness
+  { breed :: forall g r m. RandomGenM g r m => g -> m Selectable,
+    fitness :: Fitness,
+    display :: String
   }
+
+instance Show Selectable where
+  show s = "Selectable { f=" ++ show (s ^. #fitness) ++ ", " ++ (s ^. #display) ++ " }"
 
 -- | Значение функции приспособленности: больше - приспособленнее
 type Fitness = Double

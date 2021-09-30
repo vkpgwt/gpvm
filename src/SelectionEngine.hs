@@ -1,39 +1,43 @@
 module SelectionEngine
-  ( select,
+  ( run,
+    new,
   )
 where
 
+import Control.Monad
 import qualified Control.Monad.Trans.State.Strict as S
 import Data.List (sortBy, sortOn)
 import Data.Ord (Down (..), comparing)
-import Selectable hiding (spawnOne)
-import System.Random (StdGen, mkStdGen)
-import Control.Monad
 import Records
+import Selectable
+import System.Random (StdGen, mkStdGen)
+import System.Random.Stateful
 
 data SelectionEngine = SelectionEngine
   { selectables :: [Selectable],
     gen :: !StdGen,
     config :: Config
   }
+  deriving (Show)
 
 data Config = Config
   { fertility :: !Int,
     maxPopulation :: !Int
   }
+  deriving (Show)
 
 defaultConfig :: Config
 defaultConfig =
   Config
-    { fertility = 1,
+    { fertility = 10,
       maxPopulation = 10
     }
 
 type State a = S.State SelectionEngine a
 
 -- | Выполнение заданного числа итераций отбора
-select :: Int -> SelectionEngine -> SelectionEngine
-select steps = S.execState (replicateM_ steps doSelectionStep)
+run :: Int -> SelectionEngine -> SelectionEngine
+run steps = S.execState (replicateM_ steps doSelectionStep)
 
 -- | Инициализация заданными данными
 new :: [Selectable] -> Int -> SelectionEngine
@@ -62,6 +66,6 @@ spawnMany num = replicateM num . spawnOne
 spawnOne :: Selectable -> State Selectable
 spawnOne s = do
   g <- S.gets gen
-  let (child, g') = (s ^. #breed) g
+  let (child, g') = runStateGen g $ Selectable.breed s
   S.modify' $ \e -> e {gen = g'}
   pure child
