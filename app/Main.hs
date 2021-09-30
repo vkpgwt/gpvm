@@ -17,4 +17,4 @@ code =
   ]
 
 runResult :: (VM.RunResult, VM.VM)
-runResult = VM.run 500000000 $ fromJust $ VM.withCode code
+runResult = VM.run 500000000 $ fromJust $ VM.mkWithCode code

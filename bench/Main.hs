@@ -15,7 +15,7 @@ main =
   defaultMain
     [ bgroup
         "VM.run"
-        [ bench "LoadConst" $ whnf (VM.run 1000000) $ fromJust $ VM.withCode code
+        [ bench "LoadConst" $ whnf (VM.run 1000000) $ fromJust $ VM.mkWithCode code
         ]
     ]
 
