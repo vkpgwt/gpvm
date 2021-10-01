@@ -21,6 +21,7 @@ dependencies:
 
 ghc-options:
   - -O2
+  - -rtsopts
 
 library:
   source-dirs: src

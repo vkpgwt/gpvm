@@ -3,9 +3,9 @@
 module VM
   ( VM (..),
     Snapshot,
-    RunResult,
+    RunResult (..),
     mkSnapshot,
-    snapshotStackIndex,
+    snapshotRelativeStack,
     run,
   )
 where
@@ -31,7 +31,17 @@ data VM = VM
   { code :: !(BV.Vector I.Instruction),
     stackSize :: !Int
   }
-  deriving Show
+
+instance Show VM where
+  show VM {..} =
+    unlines $
+      [ "{ VM",
+        "    stackSize = " ++ show stackSize,
+        "    codeSize = " ++ show (V.length code),
+        "    code = ["
+      ]
+        ++ map (("        " ++) . show) (V.toList code)
+        ++ ["    ]", "}"]
 
 data Snapshot = Snapshot
   { code :: !(BV.Vector I.Instruction),
@@ -72,9 +82,11 @@ mkSnapshot vm
           pc = 0
         }
 
-snapshotStackIndex :: Int -> Snapshot -> Maybe W
-snapshotStackIndex relIdx Snapshot{stack, sp} =
-  stack V.!? ((sp + relIdx) `mod` V.length stack)
+-- | Returns the stack of a snapshot as a list where i-th element corresponds to the stack element at address SP-i
+snapshotRelativeStack :: Snapshot -> [W]
+snapshotRelativeStack Snapshot {stack, sp} =
+  let list = V.toList stack
+   in reverse (take (sp + 1) list) ++ reverse (drop (sp + 1) list)
 
 run :: Int -> Snapshot -> (RunResult, Snapshot)
 run maxSteps vm = withMutVM vm $ do
