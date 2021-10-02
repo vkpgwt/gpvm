@@ -1,34 +1,31 @@
 module VM.Instruction
   ( Instruction (..),
-    OpCode (OpCode),
+    OpCode (..),
     OpCodeName (..),
     opcode,
-    arg,
+    opCodeName,
+    argOf,
     loadConst,
     end,
+    nop,
   )
 where
 
-import Data.Bits
+import Data.Bits (Bits (shiftL, unsafeShiftR, (.&.), (.|.)))
 import Data.Int (Int16, Int8)
-import Data.List (intercalate)
-import Data.Word
 
 data OpCodeName
   = LoadConst
   | End
+  | Unknown
+  | Add
+  | Dup
+  | Drop
+  | Sub
+  | Mul
   deriving (Eq, Show, Read, Enum, Bounded)
 
-newtype OpCode = OpCodeRaw {getOpCode :: Int}
-
--- todo: may be slow
-pattern OpCode :: OpCodeName -> OpCode
-pattern OpCode e <- OpCodeRaw (mbToEnum @OpCodeName -> Just e)
-
-mbToEnum :: forall e. (Enum e, Bounded e) => Int -> Maybe e
-mbToEnum x
-  | x >= fromEnum (minBound @e) && x <= fromEnum (maxBound @e) = Just $ toEnum x
-  | otherwise = Nothing
+newtype OpCode = OpCode {getOpCode :: Int}
 
 newtype Instruction = Instruction {getInstruction :: Int16}
 
@@ -39,27 +36,30 @@ mkInstruction :: OpCodeName -> Instruction
 mkInstruction opc = mkInstruction1 opc 1
 
 opcode :: Instruction -> OpCode
-opcode = OpCodeRaw . fromIntegral . (.&. 0xff) . getInstruction
+opcode = OpCode . fromIntegral . (.&. 0xff) . getInstruction
 
-arg :: Instruction -> Int
-arg = fromIntegral . (`unsafeShiftR` 8) . getInstruction
+opCodeName :: OpCode -> OpCodeName
+opCodeName (OpCode c)
+  | c >= fromEnum (minBound @OpCodeName) && c <= fromEnum (maxBound @OpCodeName) = toEnum c
+  | otherwise = Unknown
+
+argOf :: Instruction -> Int
+argOf = fromIntegral . (`unsafeShiftR` 8) . getInstruction
 
 instance Show Instruction where
-  show i = unwords $ mnemonic : argComponents
+  show i = unwords $ show opName : argComponents
     where
-      argComponents = case opcode i of
-        OpCode LoadConst -> [show $ arg i]
-        _ -> []
+      opName = opCodeName $ opcode i
 
-      mnemonic = case opcode i of
-        OpCodeRaw c
-          | c >= fromEnum @OpCodeName minBound && c <= fromEnum @OpCodeName maxBound ->
-            show $ toEnum @OpCodeName c
-          | otherwise ->
-            "Unknown_" ++ show c
+      argComponents = case opName of
+        LoadConst -> [show $ argOf i]
+        _ -> []
 
 loadConst :: Int8 -> Instruction
 loadConst = mkInstruction1 LoadConst
 
 end :: Instruction
 end = mkInstruction End
+
+nop :: Instruction
+nop = mkInstruction Unknown

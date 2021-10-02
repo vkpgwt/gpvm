@@ -1,9 +1,8 @@
 module Records ((^.), (?.)) where
 
-import Data.Proxy (Proxy (..))
 import GHC.OverloadedLabels
 import GHC.Records
-import GHC.TypeLits (KnownSymbol, Symbol, symbolVal)
+import GHC.TypeLits (Symbol)
 
 data Field (name :: Symbol) = Field
 

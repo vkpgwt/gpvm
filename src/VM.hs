@@ -2,20 +2,19 @@
 
 module VM
   ( VM (..),
-    Snapshot,
+    Snapshot (..),
     RunResult (..),
+    W,
     mkSnapshot,
     snapshotRelativeStack,
     run,
   )
 where
 
-import Control.Applicative
 import Control.Monad.Reader
 import Control.Monad.ST
 import Control.Monad.State
 import Data.Int
-import Data.Vector (Vector)
 import qualified Data.Vector as BV
 import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Generic.Mutable as MV
@@ -135,30 +134,64 @@ runMut maxSteps
 step :: Run s StepResult
 step = do
   instr <- currentInstruction
+  incPC 1
 
-  let opcode = I.opcode instr
-      arg = I.arg instr
+  let opcode = I.opCodeName $ I.opcode instr
+      arg = I.argOf instr
 
   case opcode of
-    I.OpCode I.LoadConst -> do
-      putToStack 0 arg
+    I.LoadConst -> do
       incSP 1
-      incPC 1
-      return StepOk
-    I.OpCode I.End ->
-      return StepEndInstruction
-    _ ->
+      setStackW 0 arg
+      pure StepOk
+    I.End ->
+      pure StepEndInstruction
+    I.Unknown ->
+      pure StepOk
+    I.Add -> do
+      incSP (-1)
+      a <- getStackW 1
+      updateStackW 0 (a +)
+      pure StepOk
+    I.Dup -> do
+      incSP 1
+      x <- getStackW (-1)
+      setStackW 0 x
+      pure StepOk
+    I.Drop -> do
+      incSP (-1)
+      pure StepOk
+    I.Sub -> do
+      incSP (-1)
+      s <- getStackW 1
+      updateStackW 0 (subtract s)
+      pure StepOk
+    I.Mul -> do
+      incSP (-1)
+      a <- getStackW 1
+      updateStackW 0 (a *)
       pure StepOk
 
 currentInstruction :: Run s I.Instruction
 currentInstruction = asks ((I.Instruction .) . V.unsafeIndex . roCode) <*> gets mutPC
 
-putToStack :: Int -> W -> Run s ()
-putToStack relIdx value = do
-  sp <- gets mutSP
+getStackW :: Int -> Run s W
+getStackW relIdx = do
+  stack <- asks roStack
+  addr <- getStackAddr relIdx
+  MV.unsafeRead stack addr
+
+setStackW :: Int -> W -> Run s ()
+setStackW relIdx value = do
   stack <- asks roStack
   addr <- getStackAddr relIdx
   MV.unsafeWrite stack addr value
+
+updateStackW :: Int -> (W -> W) -> Run s ()
+updateStackW relIdx update = do
+  stack <- asks roStack
+  addr <- getStackAddr relIdx
+  MV.unsafeModify stack update addr
 
 -- NB: may be slow
 getStackAddr :: Int -> Run s Int

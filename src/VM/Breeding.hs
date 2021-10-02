@@ -6,12 +6,14 @@ where
 import Control.Monad
 import Data.Bits
 import Data.Foldable
-import Data.Maybe
-import qualified Data.Vector as V
+import qualified Data.Vector as BV
+import qualified Data.Vector.Generic as V
+import GHC.Base (NonEmpty ((:|)))
 import Records
 import Selectable
 import System.Random.Stateful
-import VM
+import VM (VM (..))
+import qualified VM
 import qualified VM.Instruction as I
 
 mkSelectable :: VM -> Selectable
@@ -27,10 +29,8 @@ mutate vm@VM {..} gen = do
   code1 <- duplicateCodeSlicesRandomly code gen
   code2 <- mutateCodeWithBitErrors code1 gen
   pure $ vm {code = code2}
-  where
-    mutateInstruction (I.Instruction i) bitNo = I.Instruction $ complementBit i bitNo
 
-mutateCodeWithBitErrors :: RandomGenM g r m => V.Vector I.Instruction -> g -> m (V.Vector I.Instruction)
+mutateCodeWithBitErrors :: RandomGenM g r m => BV.Vector I.Instruction -> g -> m (BV.Vector I.Instruction)
 mutateCodeWithBitErrors code gen = do
   let oneErrorPerNInstructions = 10
   let maxNumErrors = max 1 $ length code `div` oneErrorPerNInstructions
@@ -43,7 +43,7 @@ mutateCodeWithBitErrors code gen = do
   where
     mutateInstruction (I.Instruction i) bitNo = I.Instruction $ complementBit i bitNo
 
-duplicateCodeSlicesRandomly :: RandomGenM g r m => V.Vector a -> g -> m (V.Vector a)
+duplicateCodeSlicesRandomly :: RandomGenM g r m => BV.Vector a -> g -> m (BV.Vector a)
 duplicateCodeSlicesRandomly code gen = do
   let maxCodeSize = 127
   let duplicationPercent = 2 :: Int
@@ -53,18 +53,40 @@ duplicateCodeSlicesRandomly code gen = do
     else pure code
 
 getFitness :: VM -> Fitness
-getFitness vm =
-  case VM.mkSnapshot vm of
-    Nothing -> (-1000000)
-    Just s0 ->
-      let (result, s1) = VM.run maxExecutionSteps s0
-          (value : _) = VM.snapshotRelativeStack s1
-          target = 100
-          basicFitness = negate . abs $ realToFrac target - realToFrac value
-          penalty = case result of
-            VM.RunMaxInstructionsReached -> 10
-            VM.RunEnded -> 0
-       in basicFitness - penalty
+getFitness vm = withSnapshot $ \defaultSnapshot ->
+  average $ fmap (fit defaultSnapshot) testData
+  where
+    testData = 0 :| [1, 2, 3, 10, 16, 39]
+
+    fit defaultSnapshot x =
+      let (runResult, vmR) = vmUnaryFunction defaultSnapshot x
+       in fitnessForResult (x * 3) vmR runResult
+
+    withSnapshot cont =
+      maybe (- 1e10) cont (VM.mkSnapshot vm)
+
+-- сделать стек растущим вниз, чтобы адресация относительно верхушки шла вверх
+
+vmUnaryFunction :: VM.Snapshot -> VM.W -> (VM.RunResult, VM.W)
+vmUnaryFunction defaultSnapshot x =
+  let startState =
+        defaultSnapshot {VM.stack = x `V.cons` V.drop 1 (defaultSnapshot ^. #stack)}
+      (result, endState) = VM.run maxExecutionSteps startState
+      (y : _) = VM.snapshotRelativeStack endState
+   in (result, y)
+
+average :: (Fractional a) => NonEmpty a -> a
+average (x0 :| xs) = total / count
+  where
+    (total, count) = foldl' f (x0, 1) xs
+    f (!s, !c) x = (s + x, c + 1)
+
+fitnessForResult :: VM.W -> VM.W -> VM.RunResult -> Fitness
+fitnessForResult expected actual runResult = negate (abs $ realToFrac expected - realToFrac actual) - penalty
+  where
+    penalty = case runResult of
+      VM.RunEnded -> 0
+      VM.RunMaxInstructionsReached -> 20
 
 maxExecutionSteps :: Int
-maxExecutionSteps = 300
+maxExecutionSteps = 128

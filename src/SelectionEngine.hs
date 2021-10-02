@@ -6,13 +6,10 @@ where
 
 import Control.Monad
 import qualified Control.Monad.Trans.State.Strict as S
-import Data.List (sortBy, sortOn)
-import Data.Maybe
-import Data.Ord (Down (..), comparing)
-import Data.Tuple
+import Data.List (sortOn)
+import Data.Ord (Down (..))
 import Records
 import Selectable
-import System.Random (StdGen, mkStdGen)
 import System.Random.Stateful
 
 data SelectionEngine = SelectionEngine
@@ -31,7 +28,7 @@ data Config = Config
 defaultConfig :: Config
 defaultConfig =
   Config
-    { fertility = 10,
+    { fertility = 1,
       maxPopulation = 1000
     }
 
@@ -67,19 +64,25 @@ doSelectionStep :: State ()
 doSelectionStep = do
   conf <- S.gets config
   parents <- S.gets selectables
-  allChildren <- concat <$> mapM (spawnMany $ conf ^. #fertility) parents
+  children <- concat <$> mapM (spawnMany $ conf ^. #fertility) parents
+  let candidates = parents ++ children
+  noises <- withRandomGen $ replicateM (length candidates) . randomRM (0, 0.01 :: Double)
   let bestSelectables =
-        take (conf ^. #maxPopulation)
-          . sortOn (Down . (^. #fitness))
-          $ allChildren ++ parents
+        map fst
+          . take (conf ^. #maxPopulation)
+          . sortOn (Down . (\(sel, noise) -> sel ^. #fitness + noise))
+          $ zip candidates noises
   S.modify' $ \e -> e {selectables = bestSelectables}
 
 spawnMany :: Int -> Selectable -> State [Selectable]
 spawnMany num = replicateM num . spawnOne
 
 spawnOne :: Selectable -> State Selectable
-spawnOne s = do
-  g <- S.gets gen
-  let (child, g') = runStateGen g $ Selectable.breed s
-  S.modify' $ \e -> e {gen = g'}
-  pure child
+spawnOne s = withRandomGen $ Selectable.breed s
+
+withRandomGen :: (StateGenM StdGen -> S.State StdGen a) -> State a
+withRandomGen f = do
+  oldGen <- S.gets gen
+  let (a, newGen) = runStateGen oldGen f
+  S.modify' $ \e -> e {gen = newGen}
+  pure a
