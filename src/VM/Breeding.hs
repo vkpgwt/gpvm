@@ -34,8 +34,7 @@ mutate vm@VM {..} gen = do
 
 mutateCodeWithBitErrors :: RandomGenM g r m => BV.Vector I.Instruction -> g -> m (BV.Vector I.Instruction)
 mutateCodeWithBitErrors code gen = do
-  let oneErrorPerNInstructions = 10
-  let maxNumErrors = max 1 $ length code `div` oneErrorPerNInstructions
+  let maxNumErrors = max 1 $ length code `div` oneErrorPerThisManyInstructions
   let instSize = finiteBitSize (I.getInstruction undefined)
   numErrors <- randomRM (0, maxNumErrors) gen
   bitAddrs <- replicateM numErrors $ do
@@ -46,13 +45,13 @@ mutateCodeWithBitErrors code gen = do
     mutateInstruction (I.Instruction i) bitNo = I.Instruction $ complementBit i bitNo
 
 duplicateCodeSlicesRandomly :: RandomGenM g r m => BV.Vector a -> g -> m (BV.Vector a)
-duplicateCodeSlicesRandomly code gen = do
-  let maxCodeSize = 127
-  let duplicationPercent = 2 :: Int
-  p <- randomRM (0, 99) gen
-  if p < duplicationPercent && V.length code <= maxCodeSize
-    then pure $ V.take maxCodeSize $ code <> code
-    else pure code
+duplicateCodeSlicesRandomly code gen
+  | V.length code >= maxCodeSize = pure code
+  | otherwise = do
+    p <- randomRM (0, 99) gen
+    if p < duplicationPercent
+      then pure $ V.take maxCodeSize $ code <> code
+      else pure code
 
 toNumericFitness :: NonEmpty Fitness -> Fitness
 toNumericFitness = average
@@ -92,6 +91,15 @@ fitnessForResult expected actual runResult = negate (abs $ realToFrac expected -
     penalty = case runResult of
       VM.RunEnded -> 0
       VM.RunMaxInstructionsReached -> 20
+
+oneErrorPerThisManyInstructions :: Int
+oneErrorPerThisManyInstructions = 3
+
+duplicationPercent :: Int
+duplicationPercent = 2 :: Int
+
+maxCodeSize :: Int
+maxCodeSize = 300
 
 maxExecutionSteps :: Int
 maxExecutionSteps = 128
