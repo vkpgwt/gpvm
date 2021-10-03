@@ -86,11 +86,14 @@ average (x0 :| xs) = total / count
     f (!s, !c) x = (s + x, c + 1)
 
 fitnessForResult :: VM.W -> VM.W -> VM.RunResult -> Fitness
-fitnessForResult expected actual runResult = negate (abs $ realToFrac expected - realToFrac actual) - penalty
+fitnessForResult expected actual runResult = negate (errorPenalty + nonTerminationPenalty)
   where
-    penalty = case runResult of
-      VM.RunEnded -> 0
-      VM.RunMaxInstructionsReached -> 20
+    errorPenalty = abs $ realToFrac expected - realToFrac actual
+    nonTerminationPenalty
+      | errorPenalty > 0.01 = 1
+      | otherwise = case runResult of
+        VM.RunEnded -> 0
+        VM.RunMaxInstructionsReached -> 1
 
 oneErrorPerThisManyInstructions :: Int
 oneErrorPerThisManyInstructions = 3
