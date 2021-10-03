@@ -1,18 +1,19 @@
 module VM.Instruction
   ( Instruction (..),
-    OpCode (..),
     OpCodeName (..),
-    opcode,
+    opCodeByteOf,
     opCodeName,
-    argOf,
+    signedArgOf,
     loadInt8,
     terminate,
     nop,
   )
 where
 
-import Data.Bits (Bits (shiftL, unsafeShiftR, (.&.), (.|.)))
-import Data.Int (Int16, Int8)
+import Data.Bits
+import Data.Int
+import Data.Word
+import Text.Printf
 
 data OpCodeName
   = LoadInt8
@@ -25,8 +26,6 @@ data OpCodeName
   | Mul
   deriving (Eq, Show, Read, Enum, Bounded)
 
-newtype OpCode = OpCode {getOpCode :: Int}
-
 newtype Instruction = Instruction {getInstruction :: Int16}
 
 mkInstruction1 :: OpCodeName -> Int8 -> Instruction
@@ -35,25 +34,29 @@ mkInstruction1 opc arg = Instruction $ shiftL (fromIntegral arg) 8 .|. fromInteg
 mkInstruction :: OpCodeName -> Instruction
 mkInstruction opc = mkInstruction1 opc 1
 
-opcode :: Instruction -> OpCode
-opcode = OpCode . fromIntegral . (.&. 0xff) . getInstruction
+opCodeByteOf :: Instruction -> Word8
+opCodeByteOf = fromIntegral . getInstruction
 
-opCodeName :: OpCode -> OpCodeName
-opCodeName (OpCode c)
-  | c >= fromEnum (minBound @OpCodeName) && c <= fromEnum (maxBound @OpCodeName) = toEnum c
+opCodeName :: Word8 -> OpCodeName
+opCodeName byte
+  | value >= fromEnum (minBound @OpCodeName) && value <= fromEnum (maxBound @OpCodeName) = toEnum value
   | otherwise = Nop
+  where
+    value = fromIntegral byte
 
-argOf :: Instruction -> Int
-argOf = fromIntegral . (`unsafeShiftR` 8) . getInstruction
+signedArgOf :: Instruction -> Int
+signedArgOf = fromIntegral . (`unsafeShiftR` 8) . getInstruction
 
 instance Show Instruction where
-  show i = unwords $ show opName : argComponents
+  show i = unwords $ show opName : (args ++ bytes)
     where
-      opName = opCodeName $ opcode i
+      opName = opCodeName $ opCodeByteOf i
 
-      argComponents = case opName of
-        LoadInt8 -> [show $ argOf i]
+      args = case opName of
+        LoadInt8 -> [show $ signedArgOf i]
         _ -> []
+
+      bytes = [printf "\t\t\t\t; 0x%04X" $ getInstruction i]
 
 loadInt8 :: Int8 -> Instruction
 loadInt8 = mkInstruction1 LoadInt8

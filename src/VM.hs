@@ -136,13 +136,13 @@ step = do
   instr <- currentInstruction
   incPC 1
 
-  let opcode = I.opCodeName $ I.opcode instr
-      arg = I.argOf instr
+  let opcode = I.opCodeName $ I.opCodeByteOf instr
+      signedArg = I.signedArgOf instr
 
   case opcode of
     I.LoadInt8 -> do
       incSP 1
-      setStackW 0 arg
+      setStackW 0 signedArg
       pure StepOk
     I.Terminate ->
       pure StepEndInstruction
