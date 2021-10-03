@@ -102,11 +102,9 @@ fitnessForResult :: VM.W -> VM.W -> VM.RunResult -> Fitness
 fitnessForResult expected actual runResult = negate (errorPenalty + nonTerminationPenalty)
   where
     errorPenalty = abs $ realToFrac expected - realToFrac actual
-    nonTerminationPenalty
-      | errorPenalty > 0.01 = 1
-      | otherwise = case runResult of
-        VM.RunEnded -> 0
-        VM.RunMaxInstructionsReached -> 1
+    nonTerminationPenalty = case runResult of
+      VM.RunEnded -> 0
+      VM.RunMaxInstructionsReached -> 1
 
 oneErrorPerThisManyInstructions :: Int
 oneErrorPerThisManyInstructions = 3
