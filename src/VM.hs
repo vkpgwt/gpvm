@@ -147,7 +147,7 @@ step = do
       pure StepOk
     I.Terminate ->
       pure StepEndInstruction
-    I.Nop ->
+    I.NoOp ->
       pure StepOk
     I.Add -> do
       incSP (-1)

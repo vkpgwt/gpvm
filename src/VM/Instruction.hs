@@ -18,7 +18,7 @@ import Text.Printf
 data OpCodeName
   = LoadInt8
   | Terminate
-  | Nop
+  | NoOp
   | Add
   | Dup
   | Drop
@@ -40,7 +40,7 @@ opCodeByteOf = fromIntegral . getInstruction
 opCodeName :: Word8 -> OpCodeName
 opCodeName byte
   | value >= fromEnum (minBound @OpCodeName) && value <= fromEnum (maxBound @OpCodeName) = toEnum value
-  | otherwise = Nop
+  | otherwise = NoOp
   where
     value = fromIntegral byte
 
@@ -65,4 +65,4 @@ terminate :: Instruction
 terminate = mkInstruction Terminate
 
 nop :: Instruction
-nop = mkInstruction Nop
+nop = mkInstruction NoOp
