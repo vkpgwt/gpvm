@@ -21,6 +21,7 @@ import qualified Data.Vector.Generic.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 import Data.Vector.Unboxed.Mutable (MVector)
 import Records
+import Text.Printf
 import qualified VM.Instruction as I
 
 -- | The machine data word
@@ -35,12 +36,12 @@ instance Show VM where
   show VM {..} =
     unlines $
       [ "{ VM",
-        "    stackSize = " ++ show stackSize,
-        "    codeSize = " ++ show (V.length code),
-        "    code = ["
+        "\tstackSize = " ++ show stackSize,
+        "\tcodeSize = " ++ show (V.length code),
+        "\tcode = ["
       ]
-        ++ map (("        " ++) . show) (V.toList code)
-        ++ ["    ]", "}"]
+        ++ (map (\(idx, inst) -> printf "\t\t%04d | %s" idx (show inst)) . V.toList . V.indexed $ code)
+        ++ ["\t]", "}"]
 
 data Snapshot = Snapshot
   { code :: !(BV.Vector I.Instruction),
