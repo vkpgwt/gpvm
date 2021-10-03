@@ -8,6 +8,7 @@ import Data.Bits
 import Data.Foldable
 import qualified Data.Vector as BV
 import qualified Data.Vector.Generic as V
+import Data.Word
 import GHC.Base (NonEmpty ((:|)))
 import Records
 import Selectable
@@ -29,20 +30,32 @@ mkSelectable vm =
 mutate :: RandomGenM g r m => VM -> g -> m VM
 mutate vm@VM {..} gen = do
   code1 <- duplicateCodeSlicesRandomly code gen
-  code2 <- mutateCodeWithBitErrors code1 gen
+  code2 <- mutateInstructions code1 gen
   pure $ vm {code = code2}
 
-mutateCodeWithBitErrors :: RandomGenM g r m => BV.Vector I.Instruction -> g -> m (BV.Vector I.Instruction)
-mutateCodeWithBitErrors code gen = do
+data SingleIntructionMutation
+  = MutateIBit !Int -- bitNo
+  | MutateIByte !Bool !Word8 -- byteNo, newByte
+
+mutateInstructions :: RandomGenM g r m => BV.Vector I.Instruction -> g -> m (BV.Vector I.Instruction)
+mutateInstructions code gen = do
   let maxNumErrors = max 1 $ length code `div` oneErrorPerThisManyInstructions
-  let instSize = finiteBitSize (I.getInstruction undefined)
   numErrors <- randomRM (0, maxNumErrors) gen
-  bitAddrs <- replicateM numErrors $ do
-    bitAddr <- randomRM (0, instSize * length code - 1) gen
-    pure $ bitAddr `divMod` instSize
-  pure $ V.accum mutateInstruction code bitAddrs
+  mutations <- replicateM numErrors $ do
+    iAddr <- randomRM (0, length code - 1) gen
+    bitErrorNotRandomByte <- randomM gen
+    mutation <-
+      if bitErrorNotRandomByte
+        then MutateIBit <$> randomRM (0, finiteBitSize (I.getInstruction undefined) - 1) gen
+        else do
+          MutateIByte <$> randomM gen <*> randomM gen
+    pure (iAddr, mutation)
+  pure $ V.accum mutateInstruction code mutations
   where
-    mutateInstruction (I.Instruction i) bitNo = I.Instruction $ complementBit i bitNo
+    mutateInstruction (I.Instruction i) (MutateIBit bitNo) = I.Instruction $ complementBit i bitNo
+    mutateInstruction inst (MutateIByte opCodeNotArg newByte)
+      | opCodeNotArg = I.setOpCodeByte newByte inst
+      | otherwise = I.setArgByte newByte inst
 
 duplicateCodeSlicesRandomly :: RandomGenM g r m => BV.Vector a -> g -> m (BV.Vector a)
 duplicateCodeSlicesRandomly code gen

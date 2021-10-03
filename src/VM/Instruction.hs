@@ -4,9 +4,13 @@ module VM.Instruction
     opCodeByteOf,
     opCodeName,
     signedArgOf,
+    unsignedArgOf,
     loadInt8,
     terminate,
     nop,
+    argByteOf,
+    setOpCodeByte,
+    setArgByte,
   )
 where
 
@@ -37,6 +41,11 @@ mkInstruction opc = mkInstruction1 opc 1
 opCodeByteOf :: Instruction -> Word8
 opCodeByteOf = fromIntegral . getInstruction
 
+setOpCodeByte :: Word8 -> Instruction -> Instruction
+setOpCodeByte b (Instruction i) =
+  Instruction . fromIntegral @Word16 @Int16 $
+    fromIntegral i .&. 0xff00 .|. fromIntegral @Word8 @Word16 b
+
 opCodeName :: Word8 -> OpCodeName
 opCodeName byte
   | value >= fromEnum (minBound @OpCodeName) && value <= fromEnum (maxBound @OpCodeName) = toEnum value
@@ -44,8 +53,17 @@ opCodeName byte
   where
     value = fromIntegral byte
 
+argByteOf :: Instruction -> Word8
+argByteOf = fromIntegral . (`unsafeShiftR` 8) . getInstruction
+
+setArgByte :: Word8 -> Instruction -> Instruction
+setArgByte b (Instruction i) = Instruction $ (fromIntegral b `unsafeShiftL` 8) .|. (i .&. 0xff)
+
 signedArgOf :: Instruction -> Int
 signedArgOf = fromIntegral . (`unsafeShiftR` 8) . getInstruction
+
+unsignedArgOf :: Instruction -> Int
+unsignedArgOf = (.&. 0xff) . signedArgOf
 
 instance Show Instruction where
   show i = unwords $ show opName : (args ++ bytes)
