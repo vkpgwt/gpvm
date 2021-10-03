@@ -14,6 +14,7 @@ where
 import Control.Monad.Reader
 import Control.Monad.ST
 import Control.Monad.State
+import Data.Bits
 import Data.Int
 import qualified Data.Vector as BV
 import qualified Data.Vector.Generic as V
@@ -40,7 +41,7 @@ instance Show VM where
         "\tcodeSize = " ++ show (V.length code),
         "\tcode = ["
       ]
-        ++ (map (\(idx, inst) -> printf "\t\t%04d | %s" idx (show inst)) . V.toList . V.indexed $ code)
+        ++ (map (\(idx, inst) -> "\t\t" ++ I.display inst idx (V.length code)) . V.toList . V.indexed $ code)
         ++ ["\t]", "}"]
 
 data Snapshot = Snapshot
@@ -49,7 +50,6 @@ data Snapshot = Snapshot
     sp :: !Int,
     pc :: !Int
   }
-  deriving (Show)
 
 type Run s a = ReaderT (ROData s) (StateT MutData (ST s)) a
 
@@ -139,11 +139,15 @@ step = do
 
   let opcode = I.opCodeName $ I.opCodeByteOf instr
       signedArg = I.signedArgOf instr
+      unsignedArg = I.unsignedArgOf instr
 
   case opcode of
     I.LoadInt8 -> do
       incSP 1
       setStackW 0 signedArg
+      pure StepOk
+    I.ExtendWord8 -> do
+      updateStackW 0 ((unsignedArg +) . (`unsafeShiftL` 8))
       pure StepOk
     I.Terminate ->
       pure StepEndInstruction
@@ -171,6 +175,17 @@ step = do
       incSP (-1)
       a <- getStackW 1
       updateStackW 0 (a *)
+      pure StepOk
+    I.Jmp -> do
+      incPC $ signedArg - 1
+      pure StepOk
+    I.JmpZ -> do
+      top <- getStackW 0
+      when (top == 0) $ incPC $ signedArg - 1
+      pure StepOk
+    I.JmpNZ -> do
+      top <- getStackW 0
+      when (top /= 0) $ incPC $ signedArg - 1
       pure StepOk
 
 currentInstruction :: Run s I.Instruction

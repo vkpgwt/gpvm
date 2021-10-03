@@ -11,7 +11,7 @@ module VM.Instruction
     argByteOf,
     setOpCodeByte,
     setArgByte,
-  )
+  display)
 where
 
 import Data.Bits
@@ -21,6 +21,7 @@ import Text.Printf
 
 data OpCodeName
   = LoadInt8
+  | ExtendWord8
   | Terminate
   | NoOp
   | Add
@@ -28,6 +29,9 @@ data OpCodeName
   | Drop
   | Sub
   | Mul
+  | Jmp
+  | JmpZ
+  | JmpNZ
   deriving (Eq, Show, Read, Enum, Bounded)
 
 newtype Instruction = Instruction {getInstruction :: Int16}
@@ -65,16 +69,21 @@ signedArgOf = fromIntegral . (`unsafeShiftR` 8) . getInstruction
 unsignedArgOf :: Instruction -> Int
 unsignedArgOf = (.&. 0xff) . signedArgOf
 
-instance Show Instruction where
-  show i = unwords $ show opName : (args ++ bytes)
-    where
-      opName = opCodeName $ opCodeByteOf i
+display :: Instruction -> Int -> Int -> String
+display i addr codeLen = unwords $ [printf "%04d |" addr, show opName] ++ args ++ bytes
+  where
+    opName = opCodeName $ opCodeByteOf i
 
-      args = case opName of
-        LoadInt8 -> [show $ signedArgOf i]
-        _ -> []
+    args = case opName of
+      LoadInt8 -> [show $ signedArgOf i]
+      ExtendWord8 -> [show $ unsignedArgOf i]
+      Jmp -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      JmpZ -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      JmpNZ -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      _ -> []
 
-      bytes = [printf "\t\t\t\t; 0x%04X" $ getInstruction i]
+    jumpTargetAddr = (addr + signedArgOf i) `mod` codeLen
+    bytes = [printf "\t\t\t\t; 0x%04X" $ getInstruction i]
 
 loadInt8 :: Int8 -> Instruction
 loadInt8 = mkInstruction1 LoadInt8
