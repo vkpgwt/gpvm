@@ -10,7 +10,7 @@ main :: IO ()
 main = do
   let e0 = SelectionEngine.new [VM.Breeding.mkSelectable $ VM.VM {code, stackSize = 16}] 0
   print e0
-  let e1 = SelectionEngine.run 100 (-0.1) e0
+  let e1 = SelectionEngine.run 300 (-0.1) e0
   print e1
 
 code :: V.Vector I.Instruction

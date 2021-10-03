@@ -73,11 +73,11 @@ detailedFitnessOf :: VM -> NonEmpty Fitness
 detailedFitnessOf vm = withSnapshot $ \defaultSnapshot ->
   fmap (fit defaultSnapshot) testData
   where
-    testData = 0 :| [1, 2, 3, 10, 16, 39]
+    testData = (0, 0) :| [(2, 1), (3, 1), (10, 3), (16, 4), (39, 6), (68, 8), (111, 10)]
 
-    fit defaultSnapshot x =
+    fit defaultSnapshot (x, expected) =
       let (runResult, vmR) = vmUnaryFunction defaultSnapshot x
-       in fitnessForResult (x * 3) vmR runResult
+       in fitnessForResult expected vmR runResult
 
     withSnapshot cont =
       maybe ((- 1e10) :| []) cont (VM.mkSnapshot vm)
@@ -98,13 +98,16 @@ average (x0 :| xs) = total / count
     (total, count) = foldl' f (x0, 1) xs
     f (!s, !c) x = (s + x, c + 1)
 
+averageSqS :: (Fractional a) => NonEmpty a -> a
+averageSqS = average . fmap (\a -> a * a * signum a)
+
 fitnessForResult :: VM.W -> VM.W -> VM.RunResult -> Fitness
 fitnessForResult expected actual runResult = negate (errorPenalty + nonTerminationPenalty)
   where
     errorPenalty = abs $ realToFrac expected - realToFrac actual
     nonTerminationPenalty = case runResult of
       VM.RunEnded -> 0
-      VM.RunMaxInstructionsReached -> 1
+      VM.RunMaxInstructionsReached -> 0.1
 
 oneErrorPerThisManyInstructions :: Int
 oneErrorPerThisManyInstructions = 3
@@ -116,4 +119,4 @@ maxCodeSize :: Int
 maxCodeSize = 300
 
 maxExecutionSteps :: Int
-maxExecutionSteps = 128
+maxExecutionSteps = 300

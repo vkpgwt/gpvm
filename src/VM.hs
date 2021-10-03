@@ -22,7 +22,6 @@ import qualified Data.Vector.Generic.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 import Data.Vector.Unboxed.Mutable (MVector)
 import Records
-import Text.Printf
 import qualified VM.Instruction as I
 
 -- | The machine data word
