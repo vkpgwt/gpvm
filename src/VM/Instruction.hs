@@ -5,8 +5,8 @@ module VM.Instruction
     opcode,
     opCodeName,
     argOf,
-    loadConst,
-    end,
+    loadInt8,
+    terminate,
     nop,
   )
 where
@@ -15,9 +15,9 @@ import Data.Bits (Bits (shiftL, unsafeShiftR, (.&.), (.|.)))
 import Data.Int (Int16, Int8)
 
 data OpCodeName
-  = LoadConst
-  | End
-  | Unknown
+  = LoadInt8
+  | Terminate
+  | Nop
   | Add
   | Dup
   | Drop
@@ -41,7 +41,7 @@ opcode = OpCode . fromIntegral . (.&. 0xff) . getInstruction
 opCodeName :: OpCode -> OpCodeName
 opCodeName (OpCode c)
   | c >= fromEnum (minBound @OpCodeName) && c <= fromEnum (maxBound @OpCodeName) = toEnum c
-  | otherwise = Unknown
+  | otherwise = Nop
 
 argOf :: Instruction -> Int
 argOf = fromIntegral . (`unsafeShiftR` 8) . getInstruction
@@ -52,14 +52,14 @@ instance Show Instruction where
       opName = opCodeName $ opcode i
 
       argComponents = case opName of
-        LoadConst -> [show $ argOf i]
+        LoadInt8 -> [show $ argOf i]
         _ -> []
 
-loadConst :: Int8 -> Instruction
-loadConst = mkInstruction1 LoadConst
+loadInt8 :: Int8 -> Instruction
+loadInt8 = mkInstruction1 LoadInt8
 
-end :: Instruction
-end = mkInstruction End
+terminate :: Instruction
+terminate = mkInstruction Terminate
 
 nop :: Instruction
-nop = mkInstruction Unknown
+nop = mkInstruction Nop

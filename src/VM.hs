@@ -140,13 +140,13 @@ step = do
       arg = I.argOf instr
 
   case opcode of
-    I.LoadConst -> do
+    I.LoadInt8 -> do
       incSP 1
       setStackW 0 arg
       pure StepOk
-    I.End ->
+    I.Terminate ->
       pure StepEndInstruction
-    I.Unknown ->
+    I.Nop ->
       pure StepOk
     I.Add -> do
       incSP (-1)

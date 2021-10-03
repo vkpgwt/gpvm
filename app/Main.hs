@@ -14,4 +14,4 @@ main = do
   print e1
 
 code :: V.Vector I.Instruction
-code = [I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.end]
+code = [I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.terminate]
