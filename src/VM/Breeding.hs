@@ -18,11 +18,13 @@ import qualified VM.Instruction as I
 
 mkSelectable :: VM -> Selectable
 mkSelectable vm =
-  Selectable
-    { breed = fmap mkSelectable . mutate vm,
-      fitness = getFitness vm,
-      display = show vm
-    }
+  let detailedFitness = detailedFitnessOf vm
+   in Selectable
+        { breed = fmap mkSelectable . mutate vm,
+          fitness = toNumericFitness detailedFitness,
+          display = show vm,
+          fitnessDetails = show $ toList detailedFitness
+        }
 
 mutate :: RandomGenM g r m => VM -> g -> m VM
 mutate vm@VM {..} gen = do
@@ -52,9 +54,12 @@ duplicateCodeSlicesRandomly code gen = do
     then pure $ V.take maxCodeSize $ code <> code
     else pure code
 
-getFitness :: VM -> Fitness
-getFitness vm = withSnapshot $ \defaultSnapshot ->
-  average $ fmap (fit defaultSnapshot) testData
+toNumericFitness :: NonEmpty Fitness -> Fitness
+toNumericFitness = average
+
+detailedFitnessOf :: VM -> NonEmpty Fitness
+detailedFitnessOf vm = withSnapshot $ \defaultSnapshot ->
+  fmap (fit defaultSnapshot) testData
   where
     testData = 0 :| [1, 2, 3, 10, 16, 39]
 
@@ -63,7 +68,7 @@ getFitness vm = withSnapshot $ \defaultSnapshot ->
        in fitnessForResult (x * 3) vmR runResult
 
     withSnapshot cont =
-      maybe (- 1e10) cont (VM.mkSnapshot vm)
+      maybe ((- 1e10) :| []) cont (VM.mkSnapshot vm)
 
 -- сделать стек растущим вниз, чтобы адресация относительно верхушки шла вверх
 
