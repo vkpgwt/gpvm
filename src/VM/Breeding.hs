@@ -98,8 +98,8 @@ average (x0 :| xs) = total / count
     (total, count) = foldl' f (x0, 1) xs
     f (!s, !c) x = (s + x, c + 1)
 
-averageSqS :: (Fractional a) => NonEmpty a -> a
-averageSqS = average . fmap (\a -> a * a * signum a)
+-- averageSqS :: (Fractional a) => NonEmpty a -> a
+-- averageSqS = average . fmap (\a -> a * a * signum a)
 
 fitnessForResult :: VM.W -> VM.W -> VM.RunResult -> Fitness
 fitnessForResult expected actual runResult = negate (errorPenalty + nonTerminationPenalty)

@@ -1,6 +1,7 @@
 module SelectionEngine
   ( run,
     new,
+    SelectionEngine (..),
   )
 where
 
