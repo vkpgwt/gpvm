@@ -157,12 +157,65 @@ step = do
       a <- getStackW 1
       updateStackW 0 (a +)
       pure StepOk
+    I.Inc -> do
+      updateStackW 0 (1 +)
+      pure StepOk
+    I.Dec -> do
+      updateStackW 0 (subtract 1)
+      pure StepOk
+    I.NotB -> do
+      updateStackW 0 complement
+      pure StepOk
+    I.NotL -> do
+      updateStackW 0 (boolToW . not . wToBool)
+      pure StepOk
+    I.AndB -> do
+      incSP (-1)
+      a <- getStackW 1
+      updateStackW 0 (a .&.)
+      pure StepOk
+    I.OrB -> do
+      incSP (-1)
+      a <- getStackW 1
+      updateStackW 0 (a .|.)
+      pure StepOk
+    I.XorB -> do
+      incSP (-1)
+      a <- getStackW 1
+      updateStackW 0 (a `xor`)
+      pure StepOk
+    I.AndL -> do
+      incSP (-1)
+      a <- getStackW 1
+      updateStackW 0 (\x -> boolToW $ wToBool a && wToBool x)
+      pure StepOk
+    I.OrL -> do
+      incSP (-1)
+      a <- getStackW 1
+      updateStackW 0 (\x -> boolToW $ wToBool a || wToBool x)
+      pure StepOk
     I.Dup -> do
       incSP 1
       x <- getStackW (-1)
       setStackW 0 x
       pure StepOk
     I.Drop -> do
+      incSP (-1)
+      pure StepOk
+    I.Swap -> do
+      a <- getStackW 0
+      b <- getStackW (-1)
+      setStackW (-1) a
+      setStackW 0 b
+      pure StepOk
+    I.LoadS -> do
+      w <- getStackW (negate signedArg)
+      setStackW 1 w
+      incSP 1
+      pure StepOk
+    I.StoreS -> do
+      w <- getStackW 0
+      setStackW (negate signedArg) w
       incSP (-1)
       pure StepOk
     I.Sub -> do
@@ -175,6 +228,16 @@ step = do
       a <- getStackW 1
       updateStackW 0 (a *)
       pure StepOk
+    I.Div -> do
+      incSP (-1)
+      a <- getStackW 1
+      updateStackW 0 (\x -> if a == 0 then 0 else x `div` a)
+      pure StepOk
+    I.Mod -> do
+      incSP (-1)
+      a <- getStackW 1
+      updateStackW 0 (\x -> if a == 0 then 0 else x `mod` a)
+      pure StepOk
     I.Jmp -> do
       incPC $ signedArg - 1
       pure StepOk
@@ -186,6 +249,46 @@ step = do
       top <- getStackW 0
       when (top /= 0) $ incPC $ signedArg - 1
       pure StepOk
+    I.CJEq -> do
+      incSP (-2)
+      a <- getStackW 1
+      b <- getStackW 2
+      when (a == b) $ incPC $ signedArg - 1
+      pure StepOk
+    I.CJNe -> do
+      incSP (-2)
+      a <- getStackW 1
+      b <- getStackW 2
+      when (a /= b) $ incPC $ signedArg - 1
+      pure StepOk
+    I.CJGt -> do
+      incSP (-2)
+      a <- getStackW 1
+      b <- getStackW 2
+      when (a > b) $ incPC $ signedArg - 1
+      pure StepOk
+    I.CJLt -> do
+      incSP (-2)
+      a <- getStackW 1
+      b <- getStackW 2
+      when (a < b) $ incPC $ signedArg - 1
+      pure StepOk
+    I.CJGe -> do
+      incSP (-2)
+      a <- getStackW 1
+      b <- getStackW 2
+      when (a >= b) $ incPC $ signedArg - 1
+      pure StepOk
+    I.CJLe -> do
+      incSP (-2)
+      a <- getStackW 1
+      b <- getStackW 2
+      when (a <= b) $ incPC $ signedArg - 1
+      pure StepOk
+  where
+    boolToW True = 1
+    boolToW False = 0
+    wToBool x = x /= 0
 
 currentInstruction :: Run s I.Instruction
 currentInstruction = asks ((I.Instruction .) . V.unsafeIndex . roCode) <*> gets mutPC

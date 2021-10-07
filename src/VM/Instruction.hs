@@ -25,13 +25,33 @@ data OpCodeName
   | Terminate
   | NoOp
   | Add
-  | Dup
-  | Drop
   | Sub
   | Mul
+  | Div
+  | Mod
+  | Inc
+  | Dec
+  | AndB
+  | OrB
+  | XorB
+  | NotB
+  | AndL
+  | OrL
+  | NotL
+  | Dup
+  | Drop
+  | Swap
+  | LoadS
+  | StoreS
   | Jmp
   | JmpZ
   | JmpNZ
+  | CJGt
+  | CJLt
+  | CJGe
+  | CJLe
+  | CJEq
+  | CJNe
   deriving (Eq, Show, Read, Enum, Bounded)
 
 newtype Instruction = Instruction {getInstruction :: Int16}
@@ -77,9 +97,18 @@ display i addr codeLen = unwords $ [printf "%04d |" addr, show opName] ++ args +
     args = case opName of
       LoadInt8 -> [show $ signedArgOf i]
       ExtendWord8 -> [show $ unsignedArgOf i]
+      LoadS -> [show $ unsignedArgOf i]
+      StoreS -> [show $ unsignedArgOf i]
       Jmp -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
       JmpZ -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
       JmpNZ -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      CJEq -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      CJNe -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      CJLt -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      CJGt -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      CJGe -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      CJLe -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+
       _ -> []
 
     jumpTargetAddr = (addr + signedArgOf i) `mod` codeLen

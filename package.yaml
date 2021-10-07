@@ -21,6 +21,8 @@ dependencies:
 
 ghc-options:
   - -Wall
+# Looking at the core
+#  - -ddump-simpl -ddump-to-file -dsuppress-all -dsuppress-uniques -dppr-cols=120 -dppr-case-as-let
 
 library:
   source-dirs: src
