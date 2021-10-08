@@ -1,89 +1,119 @@
 module SelectionEngine
   ( run,
-    new,
-    SelectionEngine (..),
+    mkState,
+    Config (..),
+    State (..),
+    Handle (..),
+    Fitness,
   )
 where
 
 import Control.Monad
+import Control.Monad.Reader
+import Control.Monad.State hiding (State)
+import qualified Control.Monad.Trans.Reader as R
 import qualified Control.Monad.Trans.State.Strict as S
 import Data.List (sortOn)
 import Data.Ord (Down (..))
 import Records
-import Selectable
 import System.Random.Stateful
 
-data SelectionEngine = SelectionEngine
-  { selectables :: [Selectable],
-    gen :: !StdGen,
-    config :: Config
+-- | Значение функции приспособленности: больше - приспособленнее
+type Fitness = Double
+
+data State s = State
+  { items :: ![Item s],
+    gen :: !StdGen
   }
   deriving (Show)
 
-data Config = Config
+data Config s = Config
   { fertility :: !Int,
-    maxPopulation :: !Int
+    maxPopulation :: !Int,
+    fitnessNoiseAmp :: !Double,
+    handle :: !(Handle s)
+  }
+
+data Handle s = Handle
+  { reproduce :: !(forall g r m. RandomGenM g r m => s -> g -> m s),
+    display :: !(s -> String),
+    fitnessOf :: !(s -> (Fitness, String)) -- fitness, fitness details (reports only)
+  }
+
+data Item s = Item
+  { fitness :: Fitness,
+    fitnessDetails :: String,
+    selectable :: !s
   }
   deriving (Show)
 
-defaultConfig :: Config
-defaultConfig =
-  Config
-    { fertility = 1,
-      maxPopulation = 1000
-    }
-
-type State a = S.State SelectionEngine a
+type RunM s a = R.ReaderT (Config s) (S.State (State s)) a
 
 type NumSteps = Int
 
 -- | Выполнение заданного числа итераций отбора
-run :: NumSteps -> Fitness -> SelectionEngine -> (NumSteps, SelectionEngine)
-run steps maxFitness = S.runState (go 0)
+run :: NumSteps -> Fitness -> Config s -> State s -> (NumSteps, State s)
+run steps maxFitness = S.runState . R.runReaderT (go 0)
   where
     go n
       | n >= steps = pure n
       | otherwise = do
-        sels <- S.gets selectables
+        sels <- gets items
         case sels of
-          (Selectable {fitness} : _)
+          (Item {fitness} : _)
             | fitness >= maxFitness -> pure n
           _ ->
             doSelectionStep >> go (n + 1)
 
 -- | Инициализация заданными данными
-new :: [Selectable] -> Int -> SelectionEngine
-new sels randomSeed =
-  SelectionEngine
-    { selectables = sels,
-      gen = mkStdGen randomSeed,
-      config = defaultConfig
+mkState :: Config s -> Int -> [s] -> State s
+mkState config randomSeed sels =
+  State
+    { items = map (mkItem config) sels,
+      gen = mkStdGen randomSeed
     }
 
+mkItem :: Config s -> s -> Item s
+mkItem Config {handle = Handle {..}} sel =
+  let (fitness, fitnessDetails) = fitnessOf sel
+   in Item
+        { selectable = sel,
+          fitness,
+          fitnessDetails
+        }
+
 -- | Одна итерация отбора
-doSelectionStep :: State ()
+doSelectionStep :: RunM s ()
 doSelectionStep = do
-  conf <- S.gets config
-  parents <- S.gets selectables
-  children <- concat <$> mapM (spawnMany $ conf ^. #fertility) parents
+  conf <- ask
+  parents <- gets items
+  children <- concat <$> mapM (spawnMany (conf ^. #fertility) . (^. #selectable)) parents
   let candidates = parents ++ children
-  noises <- withRandomGen $ replicateM (length candidates) . randomRM (0, 0.01 :: Double)
-  let bestSelectables =
+  noises <- replicateM (length candidates) generateFitnessNoise
+  let bestItems =
         map fst
           . take (conf ^. #maxPopulation)
-          . sortOn (Down . (\(sel, noise) -> sel ^. #fitness + noise))
+          . sortOn (Down . (\(item, noise) -> item ^. #fitness + noise))
           $ zip candidates noises
-  S.modify' $ \e -> e {selectables = bestSelectables}
+  modify' $ \s -> s {items = bestItems}
 
-spawnMany :: Int -> Selectable -> State [Selectable]
+generateFitnessNoise :: RunM s Fitness
+generateFitnessNoise = do
+  conf <- ask
+  withRandomGen $ randomRM (conf ^. #fitnessNoiseAmp * (-0.5), conf ^. #fitnessNoiseAmp * 0.5)
+
+spawnMany :: Int -> s -> RunM s [Item s]
 spawnMany num = replicateM num . spawnOne
 
-spawnOne :: Selectable -> State Selectable
-spawnOne s = withRandomGen $ Selectable.breed s
+spawnOne :: s -> RunM s (Item s)
+spawnOne s = do
+  config <- ask
+  sel <- withRandomGen $ reproduce (config ^. #handle) s
+  pure $ mkItem config sel
 
-withRandomGen :: (StateGenM StdGen -> S.State StdGen a) -> State a
+withRandomGen :: (StateGenM StdGen -> S.State StdGen a) -> RunM s a
 withRandomGen f = do
-  oldGen <- S.gets gen
+  oldGen <- gets gen
   let (a, newGen) = runStateGen oldGen f
-  S.modify' $ \e -> e {gen = newGen}
+  modify' $ \e -> e {gen = newGen}
   pure a

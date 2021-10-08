@@ -1,5 +1,5 @@
 module VM.Breeding
-  ( mkSelectable,
+  ( selectionEngineHandle,
   )
 where
 
@@ -11,21 +11,21 @@ import qualified Data.Vector.Generic as V
 import Data.Word
 import GHC.Base (NonEmpty ((:|)))
 import Records
-import Selectable
+import SelectionEngine (Fitness, Handle (..))
 import System.Random.Stateful
 import VM (VM (..))
 import qualified VM
 import qualified VM.Instruction as I
 
-mkSelectable :: VM -> Selectable
-mkSelectable vm =
-  let detailedFitness = detailedFitnessOf vm
-   in Selectable
-        { breed = fmap mkSelectable . mutate vm,
-          fitness = toNumericFitness detailedFitness,
-          display = show vm,
-          fitnessDetails = show $ toList detailedFitness
-        }
+selectionEngineHandle :: Handle VM
+selectionEngineHandle =
+  Handle
+    { reproduce = mutate,
+      display = show,
+      fitnessOf = \vm ->
+        let details = detailedFitnessOf vm
+         in (toNumericFitness details, show $ toList details)
+    }
 
 mutate :: RandomGenM g r m => VM -> g -> m VM
 mutate vm@VM {..} gen = do
