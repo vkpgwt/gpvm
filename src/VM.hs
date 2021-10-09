@@ -7,10 +7,10 @@ module VM
     W,
     snapshotRelativeStack,
     run,
-    checkSnapshot,
   )
 where
 
+import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.ST
 import Control.Monad.State
@@ -38,7 +38,9 @@ type Run s a = ReaderT (ROData s) (StateT MutData (ST s)) a
 
 data ROData s = ROData
   { roCode :: {-# UNPACK #-} !(UV.Vector Int16),
-    roStack :: {-# UNPACK #-} !(MVector s W)
+    roStack :: {-# UNPACK #-} !(MVector s W),
+    roCodeLen :: {-# UNPACK #-} !(PowerOf2 Int),
+    roStackLen :: {-# UNPACK #-} !(PowerOf2 Int)
   }
 
 data MutData = MutData
@@ -66,37 +68,37 @@ snapshotRelativeStack Snapshot {stack, sp} =
    in reverse (take (sp + 1) list) ++ reverse (drop (sp + 1) list)
 
 run :: Int -> Snapshot -> Either SnapshotError (RunResult, Snapshot)
-run maxSteps vm = case checkSnapshot vm of
-  Just err -> Left err
-  Nothing -> Right $
-    withMutVM vm $ do
-      result <- runMut maxSteps
-      vm' <- freezeVM
-      return (result, vm')
+run maxSteps vm = withMutVM vm $ do
+  result <- runMut maxSteps
+  vm' <- freezeVM
+  return (result, vm')
 
-checkSnapshot :: Snapshot -> Maybe SnapshotError
-checkSnapshot vm
-  | not . isPowerOfTwo . V.length $ vm ^. #code = Just InvalidCodeSize
-  | not . isPowerOfTwo . V.length $ vm ^. #stack = Just InvalidStackSize
-  | otherwise = Nothing
+checkCodeLen :: Snapshot -> Either SnapshotError (PowerOf2 Int)
+checkCodeLen vm = maybe (Left InvalidCodeSize) Right $ toPowerOf2 $ V.length $ vm ^. #code
 
-isPowerOfTwo :: (Ord a, Num a, Bits a) => a -> Bool
-isPowerOfTwo x = x > 0 && x .&. (x - 1) == 0
+checkStackLen :: Snapshot -> Either SnapshotError (PowerOf2 Int)
+checkStackLen vm = maybe (Left InvalidStackSize) Right $ toPowerOf2 $ V.length $ vm ^. #stack
 
-withMutVM :: Snapshot -> (forall s. Run s a) -> a
-withMutVM vm action = runST $ do
-  stack <- V.thaw $ stack vm
-  let roData =
-        ROData
-          { roCode = V.convert . fmap I.getInstruction $ vm ^. #code,
-            roStack = stack
-          }
-      mutData =
-        MutData
-          { mutSP = sp vm,
-            mutPC = pc vm
-          }
-  evalStateT (runReaderT action roData) mutData
+withMutVM :: Snapshot -> (forall s. Run s a) -> Either SnapshotError a
+withMutVM vm action = runExcept $ do
+  codeLen <- ExceptT $ pure $ checkCodeLen vm
+  stackLen <- ExceptT $ pure $ checkStackLen vm
+  pure $
+    runST $ do
+      stack <- V.thaw $ stack vm
+      let roData =
+            ROData
+              { roCode = V.convert . fmap I.getInstruction $ vm ^. #code,
+                roStack = stack,
+                roCodeLen = codeLen,
+                roStackLen = stackLen
+              }
+          mutData =
+            MutData
+              { mutSP = sp vm,
+                mutPC = pc vm
+              }
+      evalStateT (runReaderT action roData) mutData
 
 freezeVM :: Run s Snapshot
 freezeVM = do
@@ -303,7 +305,7 @@ updateStackW relIdx update = do
 -- NB: may be slow
 getStackAddr :: Int -> Run s Int
 getStackAddr relIdx = do
-  len <- asks (MV.length . roStack)
+  len <- asks roStackLen
   sp <- gets mutSP
   pure $ (sp + relIdx) `modPowerOf2` len
 
@@ -314,8 +316,15 @@ incSP increment = do
 
 incPC :: Int -> Run s ()
 incPC increment = do
-  codeLen <- asks $ V.length . roCode
+  codeLen <- asks roCodeLen
   modify' $ \s -> s {mutPC = (increment + mutPC s) `modPowerOf2` codeLen}
 
-modPowerOf2 :: (Bits a, Num a) => a -> a -> a
-modPowerOf2 a b = a .&. (b - 1)
+newtype PowerOf2 a = PowerOf2 a
+
+toPowerOf2 :: (Ord a, Num a, Bits a) => a -> Maybe (PowerOf2 a)
+toPowerOf2 x
+  | x > 0 && x .&. (x - 1) == 0 = Just $ PowerOf2 x
+  | otherwise = Nothing
+
+modPowerOf2 :: (Bits a, Num a) => a -> PowerOf2 a -> a
+modPowerOf2 a (PowerOf2 b) = a .&. (b - 1)
