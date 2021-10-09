@@ -4,7 +4,6 @@ import qualified Data.Vector as V
 import Records
 import qualified SelectionEngine
 import Text.Printf
-import qualified VM
 import qualified VM.Breeding
 import qualified VM.Instruction as I
 
@@ -18,7 +17,7 @@ main = do
             fitnessNoiseAmp = 0.01,
             handle
           }
-  let state0 = SelectionEngine.mkState config 0 [VM.VM {code, stackSize = 16}]
+  let state0 = SelectionEngine.mkState config 0 [VM.Breeding.VM {code, stackSize = 16}]
   print state0
 
   let (passedNumSteps, state1) = SelectionEngine.run 1000 (-0.1) config state0

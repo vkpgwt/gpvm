@@ -1,13 +1,13 @@
 {-# LANGUAGE RankNTypes #-}
 
 module VM
-  ( VM (..),
-    Snapshot (..),
+  ( Snapshot (..),
     RunResult (..),
+    SnapshotError (..),
     W,
-    mkSnapshot,
     snapshotRelativeStack,
     run,
+    checkSnapshot,
   )
 where
 
@@ -27,22 +27,6 @@ import qualified VM.Instruction as I
 -- | The machine data word
 type W = Int
 
-data VM = VM
-  { code :: !(BV.Vector I.Instruction),
-    stackSize :: !Int
-  }
-
-instance Show VM where
-  show VM {..} =
-    unlines $
-      [ "{ VM",
-        "\tstackSize = " ++ show stackSize,
-        "\tcodeSize = " ++ show (V.length code),
-        "\tcode = ["
-      ]
-        ++ (map (\(idx, inst) -> "\t\t" ++ I.display inst idx (V.length code)) . V.toList . V.indexed $ code)
-        ++ ["\t]", "}"]
-
 data Snapshot = Snapshot
   { code :: !(BV.Vector I.Instruction),
     stack :: !(UV.Vector W),
@@ -54,7 +38,7 @@ type Run s a = ReaderT (ROData s) (StateT MutData (ST s)) a
 
 data ROData s = ROData
   { roCode :: {-# UNPACK #-} !(UV.Vector Int16),
-    roCodeLen :: {-# UNPACK #-} !Int,
+    roCodeLen :: {-# UNPACK #-} !Int, -- todo: it's unneeded
     roStack :: {-# UNPACK #-} !(MVector s W)
   }
 
@@ -66,20 +50,14 @@ data MutData = MutData
 data StepResult = StepOk | StepEndInstruction
   deriving (Show)
 
-data RunResult = RunEnded | RunMaxInstructionsReached
-  deriving (Show)
+data RunResult
+  = RunTerminated
+  | RunMaxInstructionsReached
+  deriving (Eq, Show)
 
-mkSnapshot :: VM -> Maybe Snapshot
-mkSnapshot vm
-  | null $ vm ^. #code = Nothing
-  | otherwise =
-    Just
-      Snapshot
-        { code = vm ^. #code,
-          stack = V.replicate (vm ^. #stackSize) 0,
-          sp = 0,
-          pc = 0
-        }
+data SnapshotError
+  = ZeroCodeLength
+  deriving (Eq, Show)
 
 -- | Returns the stack of a snapshot as a list where i-th element corresponds to the stack element at address SP-i
 snapshotRelativeStack :: Snapshot -> [W]
@@ -87,11 +65,19 @@ snapshotRelativeStack Snapshot {stack, sp} =
   let list = V.toList stack
    in reverse (take (sp + 1) list) ++ reverse (drop (sp + 1) list)
 
-run :: Int -> Snapshot -> (RunResult, Snapshot)
-run maxSteps vm = withMutVM vm $ do
-  result <- runMut maxSteps
-  vm' <- freezeVM
-  return (result, vm')
+run :: Int -> Snapshot -> Either SnapshotError (RunResult, Snapshot)
+run maxSteps vm = case checkSnapshot vm of
+  Just err -> Left err
+  Nothing -> Right $
+    withMutVM vm $ do
+      result <- runMut maxSteps
+      vm' <- freezeVM
+      return (result, vm')
+
+checkSnapshot :: Snapshot -> Maybe SnapshotError
+checkSnapshot vm
+  | V.null $ vm ^. #code = Just ZeroCodeLength
+  | otherwise = Nothing
 
 withMutVM :: Snapshot -> (forall s. Run s a) -> a
 withMutVM vm action = runST $ do
@@ -129,7 +115,7 @@ runMut maxSteps
     result <- step
     case result of
       StepOk -> runMut (maxSteps - 1)
-      StepEndInstruction -> return RunEnded
+      StepEndInstruction -> return RunTerminated
 
 step :: Run s StepResult
 step = do

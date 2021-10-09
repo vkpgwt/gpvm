@@ -4,8 +4,9 @@ module Main
 where
 
 import Criterion.Main
-import Data.Maybe
-import qualified Data.Vector as V
+import Data.Either
+import qualified Data.Vector as BV
+import qualified Data.Vector.Generic as V
 import qualified VM
 import qualified VM.Instruction as I
 
@@ -15,16 +16,17 @@ main =
     [ bgroup
         "VM.run"
         [ bench "LoadInt8" $
-            whnf (VM.run 1000000) $
-              fromJust . VM.mkSnapshot $
-                VM.VM
-                  { code = code,
-                    stackSize = 16
-                  }
+            whnf (fromRight (error "Unexpected Left in VM.run result") . VM.run 1000000) $
+              VM.Snapshot
+                { code = code,
+                  stack = V.replicate 16 0,
+                  sp = 0,
+                  pc = 0
+                }
         ]
     ]
 
-code :: V.Vector I.Instruction
+code :: BV.Vector I.Instruction
 code =
   [ I.loadInt8 10,
     I.loadInt8 20,
