@@ -125,145 +125,145 @@ step = do
       unsignedArg = I.unsignedArgOf instr
 
   case opcode of
-    I.LoadInt8 -> do
+    I.LoadInt8'U -> do
       incSP 1
       setStackW 0 signedArg
       pure StepOk
-    I.ExtendWord8 -> do
+    I.ExtendWord8'K -> do
       updateStackW 0 ((unsignedArg +) . (`unsafeShiftL` 8))
       pure StepOk
-    I.Terminate ->
+    I.Terminate'K ->
       pure StepEndInstruction
-    I.NoOp ->
+    I.NoOp'K ->
       pure StepOk
-    I.Add -> do
+    I.Add'P -> do
       incSP (-1)
       a <- getStackW 1
       updateStackW 0 (a +)
       pure StepOk
-    I.Inc -> do
+    I.Inc'K -> do
       updateStackW 0 (1 +)
       pure StepOk
-    I.Dec -> do
+    I.Dec'K -> do
       updateStackW 0 (subtract 1)
       pure StepOk
-    I.NotB -> do
+    I.NotB'K -> do
       updateStackW 0 complement
       pure StepOk
-    I.NotL -> do
+    I.NotL'K -> do
       updateStackW 0 (boolToW . not . wToBool)
       pure StepOk
-    I.AndB -> do
+    I.AndB'P -> do
       incSP (-1)
       a <- getStackW 1
       updateStackW 0 (a .&.)
       pure StepOk
-    I.OrB -> do
+    I.OrB'P -> do
       incSP (-1)
       a <- getStackW 1
       updateStackW 0 (a .|.)
       pure StepOk
-    I.XorB -> do
+    I.XorB'P -> do
       incSP (-1)
       a <- getStackW 1
       updateStackW 0 (a `xor`)
       pure StepOk
-    I.AndL -> do
+    I.AndL'P -> do
       incSP (-1)
       a <- getStackW 1
       updateStackW 0 (\x -> boolToW $ wToBool a && wToBool x)
       pure StepOk
-    I.OrL -> do
+    I.OrL'P -> do
       incSP (-1)
       a <- getStackW 1
       updateStackW 0 (\x -> boolToW $ wToBool a || wToBool x)
       pure StepOk
-    I.Dup -> do
+    I.Dup'U -> do
       incSP 1
       x <- getStackW (-1)
       setStackW 0 x
       pure StepOk
-    I.Drop -> do
+    I.Drop'P -> do
       incSP (-1)
       pure StepOk
-    I.Swap -> do
+    I.Swap'K -> do
       a <- getStackW 0
       b <- getStackW (-1)
       setStackW (-1) a
       setStackW 0 b
       pure StepOk
-    I.LoadS -> do
+    I.LoadS'U -> do
       w <- getStackW (negate signedArg)
       setStackW 1 w
       incSP 1
       pure StepOk
-    I.StoreS -> do
+    I.StoreS'P -> do
       w <- getStackW 0
       setStackW (negate signedArg) w
       incSP (-1)
       pure StepOk
-    I.Sub -> do
+    I.Sub'P -> do
       incSP (-1)
       s <- getStackW 1
       updateStackW 0 (subtract s)
       pure StepOk
-    I.Mul -> do
+    I.Mul'P -> do
       incSP (-1)
       a <- getStackW 1
       updateStackW 0 (a *)
       pure StepOk
-    I.Div -> do
+    I.Div'P -> do
       incSP (-1)
       a <- getStackW 1
       updateStackW 0 (\x -> if a == 0 then 0 else x `div` a)
       pure StepOk
-    I.Mod -> do
+    I.Mod'P -> do
       incSP (-1)
       a <- getStackW 1
       updateStackW 0 (\x -> if a == 0 then 0 else x `mod` a)
       pure StepOk
-    I.Jmp -> do
+    I.Jmp'K -> do
       incPC $ signedArg - 1
       pure StepOk
-    I.JmpZ -> do
+    I.JmpZ'K -> do
       top <- getStackW 0
       when (top == 0) $ incPC $ signedArg - 1
       pure StepOk
-    I.JmpNZ -> do
+    I.JmpNZ'K -> do
       top <- getStackW 0
       when (top /= 0) $ incPC $ signedArg - 1
       pure StepOk
-    I.CJEq -> do
+    I.CJEq'PP -> do
       incSP (-2)
       a <- getStackW 1
       b <- getStackW 2
       when (a == b) $ incPC $ signedArg - 1
       pure StepOk
-    I.CJNe -> do
+    I.CJNe'PP -> do
       incSP (-2)
       a <- getStackW 1
       b <- getStackW 2
       when (a /= b) $ incPC $ signedArg - 1
       pure StepOk
-    I.CJGt -> do
+    I.CJGt'PP -> do
       incSP (-2)
       a <- getStackW 1
       b <- getStackW 2
       when (a > b) $ incPC $ signedArg - 1
       pure StepOk
-    I.CJLt -> do
+    I.CJLt'PP -> do
       incSP (-2)
       a <- getStackW 1
       b <- getStackW 2
       when (a < b) $ incPC $ signedArg - 1
       pure StepOk
-    I.CJGe -> do
+    I.CJGe'PP -> do
       incSP (-2)
       a <- getStackW 1
       b <- getStackW 2
       when (a >= b) $ incPC $ signedArg - 1
       pure StepOk
-    I.CJLe -> do
+    I.CJLe'PP -> do
       incSP (-2)
       a <- getStackW 1
       b <- getStackW 2

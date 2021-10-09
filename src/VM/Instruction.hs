@@ -11,7 +11,8 @@ module VM.Instruction
     argByteOf,
     setOpCodeByte,
     setArgByte,
-  display)
+    display,
+  )
 where
 
 import Data.Bits
@@ -20,38 +21,38 @@ import Data.Word
 import Text.Printf
 
 data OpCodeName
-  = LoadInt8
-  | ExtendWord8
-  | Terminate
-  | NoOp
-  | Add
-  | Sub
-  | Mul
-  | Div
-  | Mod
-  | Inc
-  | Dec
-  | AndB
-  | OrB
-  | XorB
-  | NotB
-  | AndL
-  | OrL
-  | NotL
-  | Dup
-  | Drop
-  | Swap
-  | LoadS
-  | StoreS
-  | Jmp
-  | JmpZ
-  | JmpNZ
-  | CJGt
-  | CJLt
-  | CJGe
-  | CJLe
-  | CJEq
-  | CJNe
+  = LoadInt8'U
+  | ExtendWord8'K
+  | Terminate'K
+  | NoOp'K
+  | Add'P
+  | Sub'P
+  | Mul'P
+  | Div'P
+  | Mod'P
+  | Inc'K
+  | Dec'K
+  | AndB'P
+  | OrB'P
+  | XorB'P
+  | NotB'K
+  | AndL'P
+  | OrL'P
+  | NotL'K
+  | Dup'U
+  | Drop'P
+  | Swap'K
+  | LoadS'U
+  | StoreS'P
+  | Jmp'K
+  | JmpZ'K
+  | JmpNZ'K
+  | CJGt'PP
+  | CJLt'PP
+  | CJGe'PP
+  | CJLe'PP
+  | CJEq'PP
+  | CJNe'PP
   deriving (Eq, Show, Read, Enum, Bounded)
 
 newtype Instruction = Instruction {getInstruction :: Int16}
@@ -73,7 +74,7 @@ setOpCodeByte b (Instruction i) =
 opCodeName :: Word8 -> OpCodeName
 opCodeName byte
   | value >= fromEnum (minBound @OpCodeName) && value <= fromEnum (maxBound @OpCodeName) = toEnum value
-  | otherwise = NoOp
+  | otherwise = NoOp'K
   where
     value = fromIntegral byte
 
@@ -95,30 +96,29 @@ display i addr codeLen = unwords $ [printf "%04d |" addr, show opName] ++ args +
     opName = opCodeName $ opCodeByteOf i
 
     args = case opName of
-      LoadInt8 -> [show $ signedArgOf i]
-      ExtendWord8 -> [show $ unsignedArgOf i]
-      LoadS -> [show $ unsignedArgOf i]
-      StoreS -> [show $ unsignedArgOf i]
-      Jmp -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      JmpZ -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      JmpNZ -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      CJEq -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      CJNe -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      CJLt -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      CJGt -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      CJGe -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      CJLe -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-
+      LoadInt8'U -> [show $ signedArgOf i]
+      ExtendWord8'K -> [show $ unsignedArgOf i]
+      LoadS'U -> [show $ unsignedArgOf i]
+      StoreS'P -> [show $ unsignedArgOf i]
+      Jmp'K -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      JmpZ'K -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      JmpNZ'K -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      CJEq'PP -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      CJNe'PP -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      CJLt'PP -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      CJGt'PP -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      CJGe'PP -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      CJLe'PP -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
       _ -> []
 
     jumpTargetAddr = (addr + signedArgOf i) `mod` codeLen
     bytes = [printf "\t\t\t\t; 0x%04X" $ getInstruction i]
 
 loadInt8 :: Int8 -> Instruction
-loadInt8 = mkInstruction1 LoadInt8
+loadInt8 = mkInstruction1 LoadInt8'U
 
 terminate :: Instruction
-terminate = mkInstruction Terminate
+terminate = mkInstruction Terminate'K
 
 nop :: Instruction
-nop = mkInstruction NoOp
+nop = mkInstruction NoOp'K
