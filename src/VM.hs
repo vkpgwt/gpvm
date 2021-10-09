@@ -55,7 +55,8 @@ data RunResult
   deriving (Eq, Show)
 
 data SnapshotError
-  = ZeroCodeLength
+  = InvalidCodeSize
+  | InvalidStackSize
   deriving (Eq, Show)
 
 -- | Returns the stack of a snapshot as a list where i-th element corresponds to the stack element at address SP-i
@@ -75,8 +76,12 @@ run maxSteps vm = case checkSnapshot vm of
 
 checkSnapshot :: Snapshot -> Maybe SnapshotError
 checkSnapshot vm
-  | V.null $ vm ^. #code = Just ZeroCodeLength
+  | not . isPowerOfTwo . V.length $ vm ^. #code = Just InvalidCodeSize
+  | not . isPowerOfTwo . V.length $ vm ^. #stack = Just InvalidStackSize
   | otherwise = Nothing
+
+isPowerOfTwo :: (Ord a, Num a, Bits a) => a -> Bool
+isPowerOfTwo x = x > 0 && x .&. (x - 1) == 0
 
 withMutVM :: Snapshot -> (forall s. Run s a) -> a
 withMutVM vm action = runST $ do
@@ -300,7 +305,7 @@ getStackAddr :: Int -> Run s Int
 getStackAddr relIdx = do
   len <- asks (MV.length . roStack)
   sp <- gets mutSP
-  pure $ (sp + relIdx) `mod` len
+  pure $ (sp + relIdx) `modPowerOf2` len
 
 incSP :: Int -> Run s ()
 incSP increment = do
@@ -310,12 +315,7 @@ incSP increment = do
 incPC :: Int -> Run s ()
 incPC increment = do
   codeLen <- asks $ V.length . roCode
-  modify' $ \s -> s {mutPC = pureIncPC increment codeLen $ mutPC s}
+  modify' $ \s -> s {mutPC = (increment + mutPC s) `modPowerOf2` codeLen}
 
-pureIncPC :: Int -> Int -> Int -> Int
-pureIncPC increment codeLen pc
-  | increment >= 0 && increment <= codeLen =
-    if increment + pc >= codeLen
-      then increment + pc - codeLen
-      else increment + pc
-  | otherwise = (increment + pc) `mod` codeLen
+modPowerOf2 :: (Bits a, Num a) => a -> a -> a
+modPowerOf2 a b = a .&. (b - 1)
