@@ -38,7 +38,6 @@ type Run s a = ReaderT (ROData s) (StateT MutData (ST s)) a
 
 data ROData s = ROData
   { roCode :: {-# UNPACK #-} !(UV.Vector Int16),
-    roCodeLen :: {-# UNPACK #-} !Int, -- todo: it's unneeded
     roStack :: {-# UNPACK #-} !(MVector s W)
   }
 
@@ -85,7 +84,6 @@ withMutVM vm action = runST $ do
   let roData =
         ROData
           { roCode = V.convert . fmap I.getInstruction $ vm ^. #code,
-            roCodeLen = length $ vm ^. #code,
             roStack = stack
           }
       mutData =
@@ -311,7 +309,7 @@ incSP increment = do
 
 incPC :: Int -> Run s ()
 incPC increment = do
-  codeLen <- asks roCodeLen
+  codeLen <- asks $ V.length . roCode
   modify' $ \s -> s {mutPC = pureIncPC increment codeLen $ mutPC s}
 
 pureIncPC :: Int -> Int -> Int -> Int
