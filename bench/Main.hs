@@ -30,5 +30,6 @@ code :: BV.Vector I.Instruction
 code =
   [ I.loadInt8 10,
     I.loadInt8 20,
+    I.loadInt8 50,
     I.loadInt8 50
   ]

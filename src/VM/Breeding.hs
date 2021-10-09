@@ -138,7 +138,7 @@ duplicationPercent :: Int
 duplicationPercent = 2 :: Int
 
 maxCodeSize :: Int
-maxCodeSize = 300
+maxCodeSize = 512
 
 maxExecutionSteps :: Int
-maxExecutionSteps = 300
+maxExecutionSteps = 512

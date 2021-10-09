@@ -27,4 +27,4 @@ main = do
   print $ take 1 $ state1 ^. #items
 
 code :: V.Vector I.Instruction
-code = [I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.terminate]
+code = [I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.terminate]
