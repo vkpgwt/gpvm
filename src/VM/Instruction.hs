@@ -91,28 +91,30 @@ unsignedArgOf :: Instruction -> Int
 unsignedArgOf = (.&. 0xff) . signedArgOf
 
 display :: Instruction -> Int -> Int -> String
-display i addr codeLen = unwords $ [printf "%04d |" addr, show opName] ++ args ++ bytes
+display i addr codeLen = printf "%04d | %-30s ; 0x%04X" addr mnemonics (getInstruction i)
   where
+    mnemonics = unwords $ show opName : args
     opName = opCodeName $ opCodeByteOf i
 
     args = case opName of
-      LoadInt8'U -> [show $ signedArgOf i]
-      ExtendWord8'K -> [show $ unsignedArgOf i]
-      LoadS'U -> [show $ unsignedArgOf i]
-      StoreS'P -> [show $ unsignedArgOf i]
-      Jmp'K -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      JmpZ'K -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      JmpNZ'K -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      CJEq'PP -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      CJNe'PP -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      CJLt'PP -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      CJGt'PP -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      CJGe'PP -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
-      CJLe'PP -> [show $ signedArgOf i, printf "#%04d" jumpTargetAddr]
+      LoadInt8'U -> [signedArg]
+      ExtendWord8'K -> [unsignedArg]
+      LoadS'U -> [unsignedArg]
+      StoreS'P -> [unsignedArg]
+      Jmp'K -> [signedArg, jumpTargetAddr]
+      JmpZ'K -> [signedArg, jumpTargetAddr]
+      JmpNZ'K -> [signedArg, jumpTargetAddr]
+      CJEq'PP -> [signedArg, jumpTargetAddr]
+      CJNe'PP -> [signedArg, jumpTargetAddr]
+      CJLt'PP -> [signedArg, jumpTargetAddr]
+      CJGt'PP -> [signedArg, jumpTargetAddr]
+      CJGe'PP -> [signedArg, jumpTargetAddr]
+      CJLe'PP -> [signedArg, jumpTargetAddr]
       _ -> []
 
-    jumpTargetAddr = (addr + signedArgOf i) `mod` codeLen
-    bytes = [printf "\t\t\t\t; 0x%04X" $ getInstruction i]
+    signedArg = show $ signedArgOf i
+    unsignedArg = show $ unsignedArgOf i
+    jumpTargetAddr = printf "(#%04d)" $ (addr + signedArgOf i) `mod` codeLen
 
 loadInt8 :: Int8 -> Instruction
 loadInt8 = mkInstruction1 LoadInt8'U
