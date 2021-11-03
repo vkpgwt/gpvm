@@ -1,6 +1,6 @@
 module SelectionEngine
   ( run,
-    mkState,
+    mkInitialState,
     Config (..),
     State (..),
     Handle (..),
@@ -23,7 +23,8 @@ type Fitness = Double
 
 data State s = State
   { items :: ![Item s],
-    gen :: !StdGen
+    gen :: !StdGen,
+    stepNo :: !Int
   }
   deriving (Show)
 
@@ -31,6 +32,7 @@ data Config s = Config
   { fertility :: !Int,
     maxPopulation :: !Int,
     fitnessNoiseAmp :: !Double,
+    maxAge :: !Int,
     handle :: !(Handle s)
   }
 
@@ -43,6 +45,8 @@ data Handle s = Handle
 data Item s = Item
   { fitness :: Fitness,
     fitnessDetails :: String,
+    bornAt :: !Int,
+    pedigree :: !Int,
     selectable :: !s
   }
   deriving (Show)
@@ -66,20 +70,23 @@ run steps maxFitness = S.runState . R.runReaderT (go 0)
             doSelectionStep >> go (n + 1)
 
 -- | Инициализация заданными данными
-mkState :: Config s -> Int -> [s] -> State s
-mkState config randomSeed sels =
+mkInitialState :: Config s -> Int -> [s] -> State s
+mkInitialState config randomSeed sels =
   State
-    { items = map (mkItem config) sels,
-      gen = mkStdGen randomSeed
+    { items = map (mkItem config 0 Nothing) sels,
+      gen = mkStdGen randomSeed,
+      stepNo = 1
     }
 
-mkItem :: Config s -> s -> Item s
-mkItem Config {handle = Handle {..}} sel =
+mkItem :: Config s -> Int -> Maybe (Item s) -> s -> Item s
+mkItem Config {handle = Handle {..}} stepNo mbParent sel =
   let (fitness, fitnessDetails) = fitnessOf sel
    in Item
         { selectable = sel,
           fitness,
-          fitnessDetails
+          fitnessDetails,
+          bornAt = stepNo,
+          pedigree = maybe 0 (succ . (^. #pedigree)) mbParent
         }
 
 -- | Одна итерация отбора
@@ -87,29 +94,32 @@ doSelectionStep :: RunM s ()
 doSelectionStep = do
   conf <- ask
   parents <- gets items
-  children <- concat <$> mapM (spawnMany (conf ^. #fertility) . (^. #selectable)) parents
-  let candidates = parents ++ children
+  stepNo' <- gets stepNo
+  children <- concat <$> mapM (spawnMany (conf ^. #fertility)) parents
+  let aliveParents = filter (\i -> stepNo' - (i ^. #bornAt) < conf ^. #maxAge) parents
+  let candidates = aliveParents ++ children
   noises <- replicateM (length candidates) generateFitnessNoise
   let bestItems =
         map fst
           . take (conf ^. #maxPopulation)
           . sortOn (Down . (\(item, noise) -> item ^. #fitness + noise))
           $ zip candidates noises
-  modify' $ \s -> s {items = bestItems}
+  modify' $ \s -> s {items = bestItems, stepNo = stepNo' + 1}
 
 generateFitnessNoise :: RunM s Fitness
 generateFitnessNoise = do
   conf <- ask
   withRandomGen $ randomRM (conf ^. #fitnessNoiseAmp * (-0.5), conf ^. #fitnessNoiseAmp * 0.5)
 
-spawnMany :: Int -> s -> RunM s [Item s]
+spawnMany :: Int -> Item s -> RunM s [Item s]
 spawnMany num = replicateM num . spawnOne
 
-spawnOne :: s -> RunM s (Item s)
+spawnOne :: Item s -> RunM s (Item s)
 spawnOne s = do
   config <- ask
-  sel <- withRandomGen $ reproduce (config ^. #handle) s
-  pure $ mkItem config sel
+  stepNo' <- gets stepNo
+  sel <- withRandomGen $ reproduce (config ^. #handle) (s ^. #selectable)
+  pure $ mkItem config stepNo' (Just s) sel
 
 withRandomGen :: (StateGenM StdGen -> S.State StdGen a) -> RunM s a
 withRandomGen f = do

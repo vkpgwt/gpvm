@@ -14,13 +14,14 @@ main = do
         SelectionEngine.Config
           { maxPopulation = 1000,
             fertility = 1,
-            fitnessNoiseAmp = 0.01,
+            fitnessNoiseAmp = 0.1,
+            maxAge = 30,
             handle
           }
-  let state0 = SelectionEngine.mkState config 0 [VM.Breeding.VM {code, stackSize = 16}]
+  let state0 = SelectionEngine.mkInitialState config 0 [VM.Breeding.VM {code, stackSize = 16}]
   print state0
 
-  let (passedNumSteps, state1) = SelectionEngine.run 1000 (-0.1) config state0
+  let (passedNumSteps, state1) = SelectionEngine.run 30000 (-0.01) config state0
   putStrLn ""
   printf "Generations performed: %d" passedNumSteps
   putStrLn ""

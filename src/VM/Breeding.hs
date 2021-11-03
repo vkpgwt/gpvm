@@ -129,7 +129,7 @@ fitnessForResult expected actual runResult = negate (errorPenalty + nonTerminati
     errorPenalty = abs $ realToFrac expected - realToFrac actual
     nonTerminationPenalty = case runResult of
       VM.RunTerminated -> 0
-      VM.RunMaxInstructionsReached -> 0.1
+      VM.RunMaxInstructionsReached -> 1
 
 oneErrorPerThisManyInstructions :: Int
 oneErrorPerThisManyInstructions = 3
