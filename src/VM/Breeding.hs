@@ -97,7 +97,7 @@ toNumericFitness = average
 detailedFitnessOf :: VM -> NonEmpty Fitness
 detailedFitnessOf vm = fmap fit testData
   where
-    testData = (0, 0) :| [(2, 1), (3, 1), (10, 3), (16, 4), (39, 6), (68, 8), (111, 10)]
+    testData = (0, 0) :| [(2, 1), (13, 3), (89, 9), (610, 24), (4181, 64), (28657, 169)]
 
     fit (x, expected) = case vmUnaryFunction (mkSnapshot vm) x of
       Left _ -> (-1e10)

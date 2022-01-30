@@ -15,17 +15,17 @@ main = do
           { maxPopulation = 1000,
             fertility = 1,
             fitnessNoiseAmp = 0.1,
-            maxAge = 30,
+            maxAge = 10,
             handle
           }
-  let state0 = SelectionEngine.mkInitialState config 0 [VM.Breeding.VM {code, stackSize = 16}]
+  let state0 = SelectionEngine.mkInitialState config 1 [VM.Breeding.VM {code, stackSize = 16}]
   print state0
 
-  let (passedNumSteps, state1) = SelectionEngine.run 30000 (-0.01) config state0
+  let (passedNumSteps, state1) = SelectionEngine.run 2000 (-0.01) config state0
   putStrLn ""
   printf "Generations performed: %d" passedNumSteps
   putStrLn ""
   print $ take 1 $ state1 ^. #items
 
 code :: V.Vector I.Instruction
-code = [I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.terminate]
+code = [I.drop'P, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.terminate]

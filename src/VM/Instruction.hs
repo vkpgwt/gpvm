@@ -12,6 +12,7 @@ module VM.Instruction
     setOpCodeByte,
     setArgByte,
     display,
+    drop'P,
   )
 where
 
@@ -124,3 +125,6 @@ terminate = mkInstruction Terminate'K
 
 nop :: Instruction
 nop = mkInstruction NoOp'K
+
+drop'P :: Instruction
+drop'P = mkInstruction Drop'P
