@@ -47,7 +47,7 @@ data Item s = Item
     fitnessDetails :: String,
     bornAt :: !Int,
     pedigree :: !Int,
-    selectable :: !s
+    beast :: !s
   }
   deriving (Show)
 
@@ -62,8 +62,8 @@ run steps maxFitness = S.runState . R.runReaderT (go 0)
     go n
       | n >= steps = pure n
       | otherwise = do
-        sels <- gets items
-        case sels of
+        beasts <- gets items
+        case beasts of
           (Item {fitness} : _)
             | fitness >= maxFitness -> pure n
           _ ->
@@ -71,18 +71,18 @@ run steps maxFitness = S.runState . R.runReaderT (go 0)
 
 -- | Инициализация заданными данными
 mkInitialState :: Config s -> Int -> [s] -> State s
-mkInitialState config randomSeed sels =
+mkInitialState config randomSeed beasts =
   State
-    { items = map (mkItem config 0 Nothing) sels,
+    { items = map (mkItem config 0 Nothing) beasts,
       gen = mkStdGen randomSeed,
       stepNo = 1
     }
 
 mkItem :: Config s -> Int -> Maybe (Item s) -> s -> Item s
-mkItem Config {handle = Handle {..}} stepNo mbParent sel =
-  let (fitness, fitnessDetails) = fitnessOf sel
+mkItem Config {handle = Handle {..}} stepNo mbParent beast =
+  let (fitness, fitnessDetails) = fitnessOf beast
    in Item
-        { selectable = sel,
+        { beast,
           fitness,
           fitnessDetails,
           bornAt = stepNo,
@@ -118,8 +118,8 @@ spawnOne :: Item s -> RunM s (Item s)
 spawnOne s = do
   config <- ask
   stepNo' <- gets stepNo
-  sel <- withRandomGen $ reproduce (config ^. #handle) (s ^. #selectable)
-  pure $ mkItem config stepNo' (Just s) sel
+  beast <- withRandomGen $ reproduce (config ^. #handle) (s ^. #beast)
+  pure $ mkItem config stepNo' (Just s) beast
 
 withRandomGen :: (StateGenM StdGen -> S.State StdGen a) -> RunM s a
 withRandomGen f = do
