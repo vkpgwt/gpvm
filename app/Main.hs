@@ -12,7 +12,7 @@ main = do
   let handle = VM.Breeding.selectionEngineHandle
   let config =
         SelectionEngine.Config
-          { maxPopulation = 1000,
+          { maxPopulation = 100,
             fertility = 1,
             fitnessNoiseAmp = 0.1,
             maxAge = 10,
