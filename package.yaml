@@ -17,10 +17,10 @@ dependencies:
   - vector >= 0.0
   - random
   - mtl
-  - criterion
 
 ghc-options:
   - -Wall
+  - -O2
 # Looking at the core
   - -ddump-simpl -ddump-to-file -dsuppress-all -dsuppress-uniques -dppr-cols=120 -dppr-case-as-let
 
@@ -62,3 +62,4 @@ benchmarks:
     main: Main.hs
     dependencies:
       - gpvm
+      - criterion

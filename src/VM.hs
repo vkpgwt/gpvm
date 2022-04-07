@@ -66,6 +66,8 @@ snapshotRelativeStack Snapshot {stack, sp} =
   let list = V.toList stack
    in reverse (take (sp + 1) list) ++ reverse (drop (sp + 1) list)
 
+-- {-# SCC run #-}
+
 run :: Int -> Snapshot -> Either SnapshotError (RunResult, Snapshot)
 run maxSteps vm = withMutVM vm $ do
   result <- runMut maxSteps

@@ -55,6 +55,8 @@ type RunM s a = R.ReaderT (Config s) (S.State (State s)) a
 
 type NumSteps = Int
 
+-- {-# SCC run #-}
+
 -- | Выполнение заданного числа итераций отбора
 run :: NumSteps -> Fitness -> Config s -> State s -> (NumSteps, State s)
 run steps maxFitness = S.runState . R.runReaderT (go 0)

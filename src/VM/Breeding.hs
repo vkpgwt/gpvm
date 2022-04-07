@@ -27,6 +27,9 @@ selectionEngineHandle =
          in (toNumericFitness details, show $ toList details)
     }
 
+-- {-# SCC mutate #-}
+-- {-# SCC toNumericFitness #-}
+
 data VM = VM
   { code :: !(SV.Vector I.Instruction),
     stackSize :: !Int
