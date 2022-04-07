@@ -7,8 +7,8 @@ where
 import Control.Monad
 import Data.Bits
 import Data.Foldable
-import qualified Data.Vector as BV
 import qualified Data.Vector.Generic as V
+import qualified Data.Vector.Unboxed as UV
 import Data.Word
 import GHC.Base (NonEmpty ((:|)))
 import Records
@@ -28,7 +28,7 @@ selectionEngineHandle =
     }
 
 data VM = VM
-  { code :: !(BV.Vector I.Instruction),
+  { code :: !(UV.Vector I.Instruction),
     stackSize :: !Int
   }
 
@@ -62,12 +62,12 @@ data SingleIntructionMutation
   = MutateIBit !Int -- bitNo
   | MutateIByte !Bool !Word8 -- byteNo, newByte
 
-mutateInstructions :: RandomGenM g r m => BV.Vector I.Instruction -> g -> m (BV.Vector I.Instruction)
+mutateInstructions :: RandomGenM g r m => UV.Vector I.Instruction -> g -> m (UV.Vector I.Instruction)
 mutateInstructions code gen = do
-  let maxNumErrors = max 1 $ length code `div` oneErrorPerThisManyInstructions
+  let maxNumErrors = max 1 $ V.length code `div` oneErrorPerThisManyInstructions
   numErrors <- randomRM (0, maxNumErrors) gen
   mutations <- replicateM numErrors $ do
-    iAddr <- randomRM (0, length code - 1) gen
+    iAddr <- randomRM (0, V.length code - 1) gen
     bitErrorNotRandomByte <- randomM gen
     mutation <-
       if bitErrorNotRandomByte
@@ -82,9 +82,9 @@ mutateInstructions code gen = do
       | opCodeNotArg = I.setOpCodeByte newByte inst
       | otherwise = I.setArgByte newByte inst
 
-duplicateCodeSlicesRandomly :: RandomGenM g r m => BV.Vector a -> g -> m (BV.Vector a)
+duplicateCodeSlicesRandomly :: (UV.Unbox a, RandomGenM g r m) => UV.Vector a -> g -> m (UV.Vector a)
 duplicateCodeSlicesRandomly code gen
-  | V.length code >= maxCodeSize = pure code
+  | UV.length code >= maxCodeSize = pure code
   | otherwise = do
     p <- randomRM (0, 99) gen
     if p < duplicationPercent

@@ -5,8 +5,8 @@ where
 
 import Criterion.Main
 import Data.Either
-import qualified Data.Vector as BV
 import qualified Data.Vector.Generic as V
+import qualified Data.Vector.Unboxed as UV
 import qualified VM
 import qualified VM.Instruction as I
 
@@ -26,7 +26,7 @@ main =
         ]
     ]
 
-code :: BV.Vector I.Instruction
+code :: UV.Vector I.Instruction
 code =
   [ I.loadInt8 10,
     I.loadInt8 20,

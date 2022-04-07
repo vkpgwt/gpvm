@@ -18,6 +18,9 @@ where
 
 import Data.Bits
 import Data.Int
+import qualified Data.Vector.Generic as V
+import qualified Data.Vector.Generic.Mutable as MV
+import qualified Data.Vector.Unboxed as UV
 import Data.Word
 import Text.Printf
 
@@ -128,3 +131,33 @@ nop = mkInstruction NoOp'K
 
 drop'P :: Instruction
 drop'P = mkInstruction Drop'P
+
+newtype instance UV.MVector s Instruction = InstructionMVector (UV.MVector s Int16)
+
+newtype instance UV.Vector Instruction = InstructionVector (UV.Vector Int16)
+
+instance MV.MVector UV.MVector Instruction where
+  basicLength (InstructionMVector v) = MV.basicLength v
+  basicUnsafeSlice x y (InstructionMVector v) = InstructionMVector $ MV.basicUnsafeSlice x y v
+  basicOverlaps (InstructionMVector v1) (InstructionMVector v2) = MV.basicOverlaps v1 v2
+  basicUnsafeNew n = InstructionMVector <$> MV.basicUnsafeNew n
+  basicInitialize (InstructionMVector v) = MV.basicInitialize v
+  basicUnsafeReplicate n (Instruction a) = InstructionMVector <$> MV.basicUnsafeReplicate n a
+  basicUnsafeRead (InstructionMVector v) i = Instruction <$> MV.basicUnsafeRead v i
+  basicUnsafeWrite (InstructionMVector v) i (Instruction a) = MV.basicUnsafeWrite v i a
+  basicClear (InstructionMVector v) = MV.basicClear v
+  basicSet (InstructionMVector v) a = MV.basicSet v (getInstruction a)
+  basicUnsafeCopy (InstructionMVector v1) (InstructionMVector v2) = MV.basicUnsafeCopy v1 v2
+  basicUnsafeMove (InstructionMVector v1) (InstructionMVector v2) = MV.basicUnsafeMove v1 v2
+  basicUnsafeGrow (InstructionMVector v) n = InstructionMVector <$> MV.basicUnsafeGrow v n
+
+instance V.Vector UV.Vector Instruction where
+  basicUnsafeFreeze (InstructionMVector v) = InstructionVector <$> V.basicUnsafeFreeze v
+  basicUnsafeThaw (InstructionVector v) = InstructionMVector <$> V.basicUnsafeThaw v
+  basicLength (InstructionVector v) = V.basicLength v
+  basicUnsafeSlice i n (InstructionVector v) = InstructionVector $ V.basicUnsafeSlice i n v
+  basicUnsafeIndexM (InstructionVector v) i = Instruction <$> V.basicUnsafeIndexM v i
+  basicUnsafeCopy (InstructionMVector mv) (InstructionVector v) = V.basicUnsafeCopy mv v
+  elemseq _ (Instruction a) = V.elemseq (undefined :: UV.Vector a) a
+
+instance UV.Unbox Instruction

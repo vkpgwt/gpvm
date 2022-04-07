@@ -15,8 +15,6 @@ import Control.Monad.Reader
 import Control.Monad.ST
 import Control.Monad.State
 import Data.Bits
-import Data.Int
-import qualified Data.Vector as BV
 import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Generic.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
@@ -28,7 +26,7 @@ import qualified VM.Instruction as I
 type W = Int
 
 data Snapshot = Snapshot
-  { code :: !(BV.Vector I.Instruction),
+  { code :: !(UV.Vector I.Instruction),
     stack :: !(UV.Vector W),
     sp :: !Int,
     pc :: !Int
@@ -37,7 +35,7 @@ data Snapshot = Snapshot
 type Run s a = ReaderT (ROData s) (StateT MutData (ST s)) a
 
 data ROData s = ROData
-  { roCode :: {-# UNPACK #-} !(UV.Vector Int16),
+  { roCode :: {-# UNPACK #-} !(UV.Vector I.Instruction),
     roStack :: {-# UNPACK #-} !(MVector s W),
     roCodeLen :: {-# UNPACK #-} !(PowerOf2 Int),
     roStackLen :: {-# UNPACK #-} !(PowerOf2 Int)
@@ -88,7 +86,7 @@ withMutVM vm action = runExcept $ do
       stack <- V.thaw $ stack vm
       let roData =
             ROData
-              { roCode = V.convert . fmap I.getInstruction $ vm ^. #code,
+              { roCode = vm ^. #code,
                 roStack = stack,
                 roCodeLen = codeLen,
                 roStackLen = stackLen
@@ -107,7 +105,7 @@ freezeVM = do
   stack <- V.freeze $ roStack roData
   return
     Snapshot
-      { code = fmap I.Instruction . V.convert $ roCode roData,
+      { code = roCode roData,
         stack = stack,
         sp = mutSP mutData,
         pc = mutPC mutData
@@ -282,7 +280,7 @@ step = do
     wToBool x = x /= 0
 
 currentInstruction :: Run s I.Instruction
-currentInstruction = asks ((I.Instruction .) . V.unsafeIndex . roCode) <*> gets mutPC
+currentInstruction = asks (V.unsafeIndex . roCode) <*> gets mutPC
 
 getStackW :: Int -> Run s W
 getStackW relIdx = do
