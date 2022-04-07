@@ -17,6 +17,7 @@ import Control.Monad.State
 import Data.Bits
 import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Generic.Mutable as MV
+import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
 import Data.Vector.Unboxed.Mutable (MVector)
 import Records
@@ -26,7 +27,7 @@ import qualified VM.Instruction as I
 type W = Int
 
 data Snapshot = Snapshot
-  { code :: !(UV.Vector I.Instruction),
+  { code :: !(SV.Vector I.Instruction),
     stack :: !(UV.Vector W),
     sp :: !Int,
     pc :: !Int
@@ -35,7 +36,7 @@ data Snapshot = Snapshot
 type Run s a = ReaderT (ROData s) (StateT MutData (ST s)) a
 
 data ROData s = ROData
-  { roCode :: {-# UNPACK #-} !(UV.Vector I.Instruction),
+  { roCode :: {-# UNPACK #-} !(SV.Vector I.Instruction),
     roStack :: {-# UNPACK #-} !(MVector s W),
     roCodeLen :: {-# UNPACK #-} !(PowerOf2 Int),
     roStackLen :: {-# UNPACK #-} !(PowerOf2 Int)

@@ -8,7 +8,7 @@ import Control.Monad
 import Data.Bits
 import Data.Foldable
 import qualified Data.Vector.Generic as V
-import qualified Data.Vector.Unboxed as UV
+import qualified Data.Vector.Storable as SV
 import Data.Word
 import GHC.Base (NonEmpty ((:|)))
 import Records
@@ -28,7 +28,7 @@ selectionEngineHandle =
     }
 
 data VM = VM
-  { code :: !(UV.Vector I.Instruction),
+  { code :: !(SV.Vector I.Instruction),
     stackSize :: !Int
   }
 
@@ -40,7 +40,7 @@ instance Show VM where
         "\tcodeSize = " ++ show (V.length code),
         "\tcode = ["
       ]
-        ++ (map (\(idx, inst) -> "\t\t" ++ I.display inst idx (V.length code)) . V.toList . V.indexed $ code)
+        ++ zipWith (\idx inst -> "\t\t" ++ I.display inst idx (V.length code)) [0 ..] (V.toList code)
         ++ ["\t]", "}"]
 
 mkSnapshot :: VM -> VM.Snapshot
@@ -62,7 +62,7 @@ data SingleIntructionMutation
   = MutateIBit !Int -- bitNo
   | MutateIByte !Bool !Word8 -- byteNo, newByte
 
-mutateInstructions :: RandomGenM g r m => UV.Vector I.Instruction -> g -> m (UV.Vector I.Instruction)
+mutateInstructions :: (V.Vector v I.Instruction, RandomGenM g r m) => v I.Instruction -> g -> m (v I.Instruction)
 mutateInstructions code gen = do
   let maxNumErrors = max 1 $ V.length code `div` oneErrorPerThisManyInstructions
   numErrors <- randomRM (0, maxNumErrors) gen
@@ -82,13 +82,13 @@ mutateInstructions code gen = do
       | opCodeNotArg = I.setOpCodeByte newByte inst
       | otherwise = I.setArgByte newByte inst
 
-duplicateCodeSlicesRandomly :: (UV.Unbox a, RandomGenM g r m) => UV.Vector a -> g -> m (UV.Vector a)
+duplicateCodeSlicesRandomly :: (V.Vector v a, RandomGenM g r m) => v a -> g -> m (v a)
 duplicateCodeSlicesRandomly code gen
-  | UV.length code >= maxCodeSize = pure code
+  | V.length code >= maxCodeSize = pure code
   | otherwise = do
     p <- randomRM (0, 99) gen
     if p < duplicationPercent
-      then pure $ V.take maxCodeSize $ code <> code
+      then pure $ V.take maxCodeSize $ code V.++ code
       else pure code
 
 toNumericFitness :: NonEmpty Fitness -> Fitness

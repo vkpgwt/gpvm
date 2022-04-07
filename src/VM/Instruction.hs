@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module VM.Instruction
   ( Instruction (..),
     OpCodeName (..),
@@ -22,6 +24,7 @@ import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Generic.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 import Data.Word
+import Foreign (Storable)
 import Text.Printf
 
 data OpCodeName
@@ -60,6 +63,7 @@ data OpCodeName
   deriving (Eq, Show, Read, Enum, Bounded)
 
 newtype Instruction = Instruction {getInstruction :: Int16}
+  deriving (Storable)
 
 mkInstruction1 :: OpCodeName -> Int8 -> Instruction
 mkInstruction1 opc arg = Instruction $ shiftL (fromIntegral arg) 8 .|. fromIntegral (fromEnum opc)

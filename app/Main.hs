@@ -1,6 +1,6 @@
 module Main (main) where
 
-import qualified Data.Vector.Unboxed as UV
+import qualified Data.Vector.Storable as SV
 import Records
 import qualified SelectionEngine
 import Text.Printf
@@ -27,5 +27,5 @@ main = do
   putStrLn ""
   print $ take 1 $ state1 ^. #items
 
-code :: UV.Vector I.Instruction
+code :: SV.Vector I.Instruction
 code = [I.drop'P, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.terminate]
