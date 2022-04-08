@@ -1,0 +1,132 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+
+name:           gpvm
+version:        0.1.0.0
+category:       Web
+homepage:       https://github.com/vkpgwt/gpvm#readme
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2020 Author name here
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+
+library
+  exposed-modules:
+      Records
+      SelectionEngine
+      VM
+      VM.Breeding
+      VM.Instruction
+  other-modules:
+      Paths_gpvm
+  hs-source-dirs:
+      src
+  default-extensions:
+      PatternSynonyms
+      ViewPatterns
+      TypeApplications
+      DataKinds
+      ConstraintKinds
+      MultiParamTypeClasses
+      TypeFamilies
+      ScopedTypeVariables
+      FlexibleInstances
+      OverloadedLabels
+      RankNTypes
+      NamedFieldPuns
+      RecordWildCards
+      DuplicateRecordFields
+      OverloadedLists
+      DisambiguateRecordFields
+      BangPatterns
+      FlexibleContexts
+      FlexibleInstances
+  ghc-options: -Wall -O2 -ddump-simpl -ddump-to-file -dsuppress-all -dsuppress-uniques -dppr-cols=120 -dppr-case-as-let
+  build-depends:
+      base >=4.7 && <5
+    , mtl
+    , random
+    , transformers >=0.5
+    , vector >=0.0
+  default-language: Haskell2010
+
+executable gpvm-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_gpvm
+  hs-source-dirs:
+      app
+  default-extensions:
+      PatternSynonyms
+      ViewPatterns
+      TypeApplications
+      DataKinds
+      ConstraintKinds
+      MultiParamTypeClasses
+      TypeFamilies
+      ScopedTypeVariables
+      FlexibleInstances
+      OverloadedLabels
+      RankNTypes
+      NamedFieldPuns
+      RecordWildCards
+      DuplicateRecordFields
+      OverloadedLists
+      DisambiguateRecordFields
+      BangPatterns
+      FlexibleContexts
+      FlexibleInstances
+  ghc-options: -Wall -O2 -ddump-simpl -ddump-to-file -dsuppress-all -dsuppress-uniques -dppr-cols=120 -dppr-case-as-let -rtsopts
+  build-depends:
+      base >=4.7 && <5
+    , gpvm
+    , mtl
+    , random
+    , transformers >=0.5
+    , vector >=0.0
+  default-language: Haskell2010
+
+benchmark gpvm-bench
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Paths_gpvm
+  hs-source-dirs:
+      bench
+  default-extensions:
+      PatternSynonyms
+      ViewPatterns
+      TypeApplications
+      DataKinds
+      ConstraintKinds
+      MultiParamTypeClasses
+      TypeFamilies
+      ScopedTypeVariables
+      FlexibleInstances
+      OverloadedLabels
+      RankNTypes
+      NamedFieldPuns
+      RecordWildCards
+      DuplicateRecordFields
+      OverloadedLists
+      DisambiguateRecordFields
+      BangPatterns
+      FlexibleContexts
+      FlexibleInstances
+  ghc-options: -Wall -O2 -ddump-simpl -ddump-to-file -dsuppress-all -dsuppress-uniques -dppr-cols=120 -dppr-case-as-let
+  build-depends:
+      base >=4.7 && <5
+    , criterion
+    , gpvm
+    , mtl
+    , random
+    , transformers >=0.5
+    , vector >=0.0
+  default-language: Haskell2010
