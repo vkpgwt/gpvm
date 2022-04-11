@@ -111,9 +111,7 @@ detailedFitnessOf vm = fmap fit testData
 vmUnaryFunction :: VM.Snapshot -> VM.W -> Either VM.SnapshotError (VM.RunResult, VM.W)
 vmUnaryFunction snapshot x = case VM.run maxExecutionSteps startState of
   Left err -> Left err
-  Right (runResult, endState) ->
-    let (y : _) = VM.snapshotRelativeStack endState
-     in Right (runResult, y)
+  Right (runResult, VM.ResultingSnapshot y) -> Right (runResult, y)
   where
     startState = snapshot {VM.stack = x `V.cons` V.drop 1 (snapshot ^. #stack)}
 

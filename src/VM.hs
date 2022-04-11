@@ -2,10 +2,10 @@
 
 module VM
   ( Snapshot (..),
+    ResultingSnapshot (..),
     RunResult (..),
     SnapshotError (..),
     W,
-    snapshotRelativeStack,
     run,
   )
 where
@@ -32,6 +32,8 @@ data Snapshot = Snapshot
     sp :: !Int,
     pc :: !Int
   }
+
+newtype ResultingSnapshot = ResultingSnapshot {stackTop :: W}
 
 type Run s a = ReaderT (ROData s) (StateT MutData (ST s)) a
 
@@ -60,19 +62,13 @@ data SnapshotError
   | InvalidStackSize
   deriving (Eq, Show)
 
--- | Returns the stack of a snapshot as a list where i-th element corresponds to the stack element at address SP-i
-snapshotRelativeStack :: Snapshot -> [W]
-snapshotRelativeStack Snapshot {stack, sp} =
-  let list = V.toList stack
-   in reverse (take (sp + 1) list) ++ reverse (drop (sp + 1) list)
-
 -- {-# SCC run #-}
 
-run :: Int -> Snapshot -> Either SnapshotError (RunResult, Snapshot)
+run :: Int -> Snapshot -> Either SnapshotError (RunResult, ResultingSnapshot)
 run maxSteps vm = withMutVM vm $ do
   result <- runMut maxSteps
-  vm' <- freezeVM
-  return (result, vm')
+  topWord <- getStackW 0
+  return (result, ResultingSnapshot topWord)
 
 checkCodeLen :: Snapshot -> Either SnapshotError (PowerOf2 Int)
 checkCodeLen vm = maybe (Left InvalidCodeSize) Right $ toPowerOf2 $ V.length $ vm ^. #code
@@ -100,19 +96,6 @@ withMutVM vm action = runExcept $ do
                 mutPC = pc vm
               }
       evalStateT (runReaderT action roData) mutData
-
-freezeVM :: Run s Snapshot
-freezeVM = do
-  roData <- ask
-  mutData <- get
-  stack <- V.freeze $ roStack roData
-  return
-    Snapshot
-      { code = roCode roData,
-        stack = stack,
-        sp = mutSP mutData,
-        pc = mutPC mutData
-      }
 
 runMut :: Int -> Run s RunResult
 runMut maxSteps
