@@ -37,7 +37,7 @@ data Config s = Config
   }
 
 data Handle s = Handle
-  { reproduce :: !(forall r. RandomGen r => s -> StateGenM r -> S.State r s),
+  { reproduce :: !(s -> StateGenM StdGen -> S.State StdGen s),
     display :: !(s -> String),
     fitnessOf :: !(s -> (Fitness, String)) -- fitness, fitness details (reports only)
   }
