@@ -71,6 +71,7 @@ library
     , random
     , transformers >=0.5
     , vector >=0.0
+    , ghc-prim
 
 executable gpvm-exe
   import: default

@@ -20,6 +20,7 @@ import qualified Data.Vector.Generic.Mutable as MV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
 import Data.Vector.Unboxed.Mutable (MVector)
+import GHC.Types (SPEC (..))
 import Records
 import qualified VM.Instruction as I
 
@@ -40,9 +41,7 @@ type Run s a = ReaderT (ROData s) (StateT MutData (ST s)) a
 
 data ROData s = ROData
   { roCode :: {-# UNPACK #-} !(SV.Vector I.Instruction),
-    roStack :: {-# UNPACK #-} !(MVector s W),
-    roCodeLen :: {-# UNPACK #-} !(PowerOf2 Int),
-    roStackLen :: {-# UNPACK #-} !(PowerOf2 Int)
+    roStack :: {-# UNPACK #-} !(MVector s W)
   }
 
 data MutData = MutData
@@ -67,29 +66,31 @@ data SnapshotError
 
 run :: Int -> Snapshot -> Either SnapshotError (RunResult, ResultingSnapshot)
 run maxSteps vm = withMutVM vm $ do
-  result <- runMut maxSteps
+  result <- runMut SPEC maxSteps
   topWord <- getStackW 0
   return (result, ResultingSnapshot topWord)
 
-checkCodeLen :: Snapshot -> Either SnapshotError (PowerOf2 Int)
-checkCodeLen vm = maybe (Left InvalidCodeSize) Right $ toPowerOf2 $ V.length $ vm ^. #code
+checkCodeLen :: Snapshot -> Either SnapshotError ()
+checkCodeLen vm
+  | isPowerOf2 $ V.length $ vm ^. #code = Right ()
+  | otherwise = Left InvalidCodeSize
 
-checkStackLen :: Snapshot -> Either SnapshotError (PowerOf2 Int)
-checkStackLen vm = maybe (Left InvalidStackSize) Right $ toPowerOf2 $ V.length $ vm ^. #stack
+checkStackLen :: Snapshot -> Either SnapshotError ()
+checkStackLen vm
+  | isPowerOf2 $ V.length $ vm ^. #stack = Right ()
+  | otherwise = Left InvalidStackSize
 
 withMutVM :: Snapshot -> (forall s. Run s a) -> Either SnapshotError a
 withMutVM vm action = runExcept $ do
-  codeLen <- ExceptT $ pure $ checkCodeLen vm
-  stackLen <- ExceptT $ pure $ checkStackLen vm
+  ExceptT $ pure $ checkCodeLen vm
+  ExceptT $ pure $ checkStackLen vm
   pure $
     runST $ do
       stack <- V.thaw $ stack vm
       let roData =
             ROData
               { roCode = vm ^. #code,
-                roStack = stack,
-                roCodeLen = codeLen,
-                roStackLen = stackLen
+                roStack = stack
               }
           mutData =
             MutData
@@ -98,13 +99,13 @@ withMutVM vm action = runExcept $ do
               }
       evalStateT (runReaderT action roData) mutData
 
-runMut :: Int -> Run s RunResult
-runMut maxSteps
+runMut :: SPEC -> Int -> Run s RunResult
+runMut !_ maxSteps
   | maxSteps <= 0 = return RunMaxInstructionsReached
   | otherwise = do
     result <- step
     case result of
-      StepOk -> runMut (maxSteps - 1)
+      StepOk -> runMut SPEC (maxSteps - 1)
       StepEndInstruction -> return RunTerminated
 
 step :: Run s StepResult
@@ -290,7 +291,7 @@ updateStackW relIdx update = do
 -- NB: may be slow
 getStackAddr :: Int -> Run s Int
 getStackAddr relIdx = do
-  len <- asks roStackLen
+  len <- asks (MV.length . roStack)
   sp <- gets mutSP
   pure $ (sp + relIdx) `modPowerOf2` len
 
@@ -301,15 +302,11 @@ incSP increment = do
 
 incPC :: Int -> Run s ()
 incPC increment = do
-  codeLen <- asks roCodeLen
+  codeLen <- asks (V.length . roCode)
   modify' $ \s -> s {mutPC = (increment + mutPC s) `modPowerOf2` codeLen}
 
-newtype PowerOf2 a = PowerOf2 a
+isPowerOf2 :: (Ord a, Num a, Bits a) => a -> Bool
+isPowerOf2 x = x > 0 && x .&. (x - 1) == 0
 
-toPowerOf2 :: (Ord a, Num a, Bits a) => a -> Maybe (PowerOf2 a)
-toPowerOf2 x
-  | x > 0 && x .&. (x - 1) == 0 = Just $ PowerOf2 x
-  | otherwise = Nothing
-
-modPowerOf2 :: (Bits a, Num a) => a -> PowerOf2 a -> a
-modPowerOf2 a (PowerOf2 b) = a .&. (b - 1)
+modPowerOf2 :: (Bits a, Num a) => a -> a -> a
+modPowerOf2 a b = a .&. (b - 1)

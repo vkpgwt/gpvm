@@ -5,6 +5,8 @@ module VM.Instruction
     OpCodeName (..),
     opCodeByteOf,
     opCodeName,
+    mkInstruction,
+    mkInstruction1,
     signedArgOf,
     unsignedArgOf,
     loadInt8,
