@@ -19,7 +19,7 @@ import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Generic.Mutable as MV
 import qualified Data.Vector.Storable as SV
 import qualified Data.Vector.Unboxed as UV
-import Data.Vector.Unboxed.Mutable (MVector)
+import qualified Data.Vector.Unboxed.Mutable as UMV
 import GHC.Types (SPEC (..))
 import Records
 import qualified VM.Instruction as I
@@ -41,7 +41,7 @@ type Run s a = ReaderT (ROData s) (StateT MutData (ST s)) a
 
 data ROData s = ROData
   { roCode :: {-# UNPACK #-} !(SV.Vector I.Instruction),
-    roStack :: {-# UNPACK #-} !(MVector s W)
+    roStack :: {-# UNPACK #-} !(UMV.MVector s W)
   }
 
 data MutData = MutData
@@ -67,7 +67,7 @@ data SnapshotError
 run :: Int -> Snapshot -> Either SnapshotError (RunResult, ResultingSnapshot)
 run maxSteps vm = withMutVM vm $ do
   result <- runMut SPEC maxSteps
-  topWord <- getStackW 0
+  topWord <- getStackTop
   return (result, ResultingSnapshot topWord)
 
 checkCodeLen :: Snapshot -> Either SnapshotError ()
@@ -119,71 +119,35 @@ step = do
 
   case opcode of
     I.LoadInt8'U -> do
+      setStackW 1 signedArg
       incSP 1
-      setStackW 0 signedArg
       pure StepOk
-    I.ExtendWord8'K -> do
-      updateStackW 0 ((unsignedArg +) . (`unsafeShiftL` 8))
-      pure StepOk
-    I.Terminate'K ->
-      pure StepEndInstruction
-    I.NoOp'K ->
-      pure StepOk
-    I.Add'P -> do
-      incSP (-1)
-      a <- getStackW 1
-      updateStackW 0 (a +)
-      pure StepOk
-    I.Inc'K -> do
-      updateStackW 0 (1 +)
-      pure StepOk
-    I.Dec'K -> do
-      updateStackW 0 (subtract 1)
-      pure StepOk
-    I.NotB'K -> do
-      updateStackW 0 complement
-      pure StepOk
-    I.NotL'K -> do
-      updateStackW 0 (boolToW . not . wToBool)
-      pure StepOk
-    I.AndB'P -> do
-      incSP (-1)
-      a <- getStackW 1
-      updateStackW 0 (a .&.)
-      pure StepOk
-    I.OrB'P -> do
-      incSP (-1)
-      a <- getStackW 1
-      updateStackW 0 (a .|.)
-      pure StepOk
-    I.XorB'P -> do
-      incSP (-1)
-      a <- getStackW 1
-      updateStackW 0 (a `xor`)
-      pure StepOk
-    I.AndL'P -> do
-      incSP (-1)
-      a <- getStackW 1
-      updateStackW 0 (\x -> boolToW $ wToBool a && wToBool x)
-      pure StepOk
-    I.OrL'P -> do
-      incSP (-1)
-      a <- getStackW 1
-      updateStackW 0 (\x -> boolToW $ wToBool a || wToBool x)
-      pure StepOk
+    I.ExtendWord8'K -> unaryOp'K $ (unsignedArg +) . (`unsafeShiftL` 8)
+    I.Terminate'K -> pure StepEndInstruction
+    I.NoOp'K -> pure StepOk
+    I.Add'P -> binaryOp'P (+)
+    I.Inc'K -> unaryOp'K (1 +)
+    I.Dec'K -> unaryOp'K (subtract 1)
+    I.NotB'K -> unaryOp'K complement
+    I.NotL'K -> unaryOp'K $ boolToW . not . wToBool
+    I.AndB'P -> binaryOp'P (.&.)
+    I.OrB'P -> binaryOp'P (.|.)
+    I.XorB'P -> binaryOp'P xor
+    I.AndL'P -> binaryOp'P $ \x y -> boolToW $ wToBool x && wToBool y
+    I.OrL'P -> binaryOp'P $ \x y -> boolToW $ wToBool x || wToBool y
     I.Dup'U -> do
+      x <- getStackTop
+      setStackW 1 x
       incSP 1
-      x <- getStackW (-1)
-      setStackW 0 x
       pure StepOk
     I.Drop'P -> do
       incSP (-1)
       pure StepOk
     I.Swap'K -> do
-      a <- getStackW 0
+      a <- getStackTop
       b <- getStackW (-1)
       setStackW (-1) a
-      setStackW 0 b
+      setStackTop b
       pure StepOk
     I.LoadS'U -> do
       w <- getStackW (negate signedArg)
@@ -191,78 +155,49 @@ step = do
       incSP 1
       pure StepOk
     I.StoreS'P -> do
-      w <- getStackW 0
+      w <- getStackTop
       setStackW (negate signedArg) w
       incSP (-1)
       pure StepOk
-    I.Sub'P -> do
-      incSP (-1)
-      s <- getStackW 1
-      updateStackW 0 (subtract s)
-      pure StepOk
-    I.Mul'P -> do
-      incSP (-1)
-      a <- getStackW 1
-      updateStackW 0 (a *)
-      pure StepOk
-    I.Div'P -> do
-      incSP (-1)
-      a <- getStackW 1
-      updateStackW 0 (\x -> if a == 0 then 0 else x `div` a)
-      pure StepOk
-    I.Mod'P -> do
-      incSP (-1)
-      a <- getStackW 1
-      updateStackW 0 (\x -> if a == 0 then 0 else x `mod` a)
-      pure StepOk
+    I.Sub'P -> binaryOp'P (-)
+    I.Mul'P -> binaryOp'P (*)
+    I.Div'P -> binaryOp'P $ \x y -> if y == 0 then 0 else x `div` y
+    I.Mod'P -> binaryOp'P $ \x y -> if y == 0 then 0 else x `mod` y
     I.Jmp'K -> do
       incPC $ signedArg - 1
       pure StepOk
     I.JmpZ'K -> do
-      top <- getStackW 0
+      top <- getStackTop
       when (top == 0) $ incPC $ signedArg - 1
       pure StepOk
     I.JmpNZ'K -> do
-      top <- getStackW 0
+      top <- getStackTop
       when (top /= 0) $ incPC $ signedArg - 1
       pure StepOk
-    I.CJEq'PP -> do
-      incSP (-2)
-      a <- getStackW 1
-      b <- getStackW 2
-      when (a == b) $ incPC $ signedArg - 1
-      pure StepOk
-    I.CJNe'PP -> do
-      incSP (-2)
-      a <- getStackW 1
-      b <- getStackW 2
-      when (a /= b) $ incPC $ signedArg - 1
-      pure StepOk
-    I.CJGt'PP -> do
-      incSP (-2)
-      a <- getStackW 1
-      b <- getStackW 2
-      when (a > b) $ incPC $ signedArg - 1
-      pure StepOk
-    I.CJLt'PP -> do
-      incSP (-2)
-      a <- getStackW 1
-      b <- getStackW 2
-      when (a < b) $ incPC $ signedArg - 1
-      pure StepOk
-    I.CJGe'PP -> do
-      incSP (-2)
-      a <- getStackW 1
-      b <- getStackW 2
-      when (a >= b) $ incPC $ signedArg - 1
-      pure StepOk
-    I.CJLe'PP -> do
-      incSP (-2)
-      a <- getStackW 1
-      b <- getStackW 2
-      when (a <= b) $ incPC $ signedArg - 1
-      pure StepOk
+    I.CJEq'PP -> compareAndJumpIf'PP (==) signedArg
+    I.CJNe'PP -> compareAndJumpIf'PP (/=) signedArg
+    I.CJGt'PP -> compareAndJumpIf'PP (>) signedArg
+    I.CJLt'PP -> compareAndJumpIf'PP (<) signedArg
+    I.CJGe'PP -> compareAndJumpIf'PP (>=) signedArg
+    I.CJLe'PP -> compareAndJumpIf'PP (<=) signedArg
   where
+    unaryOp'K op = do
+      updateStackTop op
+      pure StepOk
+
+    binaryOp'P op = do
+      y <- getStackTop
+      updateStackW (-1) (`op` y)
+      incSP (-1)
+      pure StepOk
+
+    compareAndJumpIf'PP cond pcRelativeOffset = do
+      a <- getStackTop
+      b <- getStackW (-1)
+      incSP (-2)
+      when (a `cond` b) $ incPC $ pcRelativeOffset - 1
+      pure StepOk
+
     boolToW True = 1
     boolToW False = 0
     wToBool x = x /= 0
@@ -276,16 +211,34 @@ getStackW relIdx = do
   addr <- getStackAddr relIdx
   MV.unsafeRead stack addr
 
+getStackTop :: Run s W
+getStackTop = do
+  stack <- asks roStack
+  addr <- gets mutSP
+  MV.unsafeRead stack addr
+
 setStackW :: Int -> W -> Run s ()
 setStackW relIdx value = do
   stack <- asks roStack
   addr <- getStackAddr relIdx
   MV.unsafeWrite stack addr value
 
+setStackTop :: W -> Run s ()
+setStackTop value = do
+  stack <- asks roStack
+  addr <- gets mutSP
+  MV.unsafeWrite stack addr value
+
 updateStackW :: Int -> (W -> W) -> Run s ()
 updateStackW relIdx update = do
   stack <- asks roStack
   addr <- getStackAddr relIdx
+  MV.unsafeModify stack update addr
+
+updateStackTop :: (W -> W) -> Run s ()
+updateStackTop update = do
+  stack <- asks roStack
+  addr <- gets mutSP
   MV.unsafeModify stack update addr
 
 -- NB: may be slow
