@@ -34,6 +34,7 @@ data Snapshot = Snapshot
   }
 
 newtype ResultingSnapshot = ResultingSnapshot {stackTop :: W}
+  deriving (Show)
 
 type Run s a = ReaderT (ROData s) (StateT MutData (ST s)) a
 
