@@ -49,6 +49,7 @@ common default
     -dsuppress-coercions
     -dsuppress-type-applications
     -dsuppress-module-prefixes
+    -dsuppress-timestamps
     -dppr-cols=120
     -dppr-case-as-let
   default-language: Haskell2010
