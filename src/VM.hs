@@ -119,8 +119,8 @@ step = do
 
   case opcode of
     I.LoadInt8'U -> do
-      setStackW 1 signedArg
       incSP 1
+      setStackTop signedArg
       pure StepOk
     I.ExtendWord8'K -> unaryOp'K $ (unsignedArg +) . (`unsafeShiftL` 8)
     I.Terminate'K -> pure StepEndInstruction
