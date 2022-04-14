@@ -151,8 +151,8 @@ step = do
       pure StepOk
     I.LoadS'U -> do
       w <- getStackW (negate signedArg)
-      setStackW 1 w
       incSP 1
+      setStackTop w
       pure StepOk
     I.StoreS'P -> do
       w <- getStackTop
