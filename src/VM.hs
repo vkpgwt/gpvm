@@ -137,8 +137,8 @@ step = do
     I.OrL'P -> binaryOp'P $ \x y -> boolToW $ wToBool x || wToBool y
     I.Dup'U -> do
       x <- getStackTop
-      setStackW 1 x
       incSP 1
+      setStackTop x
       pure StepOk
     I.Drop'P -> do
       incSP (-1)
