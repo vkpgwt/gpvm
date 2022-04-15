@@ -27,5 +27,15 @@ main = do
   putStrLn ""
   print $ take 1 $ state1 ^. #items
 
-code :: SV.Vector I.Instruction
-code = [I.drop'P, I.nop, I.nop, I.nop, I.nop, I.nop, I.nop, I.terminate]
+code :: SV.Vector I.W
+code =
+  I.mkCode
+    [ I.mkInstruction I.Drop'P,
+      I.mkInstruction I.NoOp'K,
+      I.mkInstruction I.NoOp'K,
+      I.mkInstruction I.NoOp'K,
+      I.mkInstruction I.NoOp'K,
+      I.mkInstruction I.NoOp'K,
+      I.mkInstruction I.NoOp'K,
+      I.mkInstruction I.Terminate'K
+    ]

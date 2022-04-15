@@ -19,21 +19,26 @@ main =
         "VM.run"
         [ bench ("All instructions (" ++ show (V.length allOpsCode) ++ ")") $
             whnf run $ snapshotWithCode allOpsCode,
-          benchInstruction I.LoadInt8'U 1,
-          benchInstruction I.Dup'U 1,
-          benchInstruction I.Add'P 1,
-          benchInstruction I.NotL'K 1
+          benchInstruction1 I.LoadInt8'U 0,
+          benchInstruction I.Dup'U,
+          benchInstruction I.Add'P,
+          benchInstruction I.NotL'K
         ]
     ]
   where
     run = fromRight (error "Unexpected Left in VM.run result") . VM.run 1000000
 
-    benchInstruction opc arg =
+    benchInstruction1 opc arg =
       let i = I.mkInstruction1 opc arg
        in bench (show opc) $
-            whnf run $ snapshotWithCode [i, i, i, i]
+            whnf run $ snapshotWithCode $ I.mkCode [i, i, i, i]
 
-snapshotWithCode :: SV.Vector I.Instruction -> VM.Snapshot
+    benchInstruction opc =
+      let i = I.mkInstruction opc
+       in bench (show opc) $
+            whnf run $ snapshotWithCode $ I.mkCode [i, i, i, i]
+
+snapshotWithCode :: SV.Vector I.W -> VM.Snapshot
 snapshotWithCode code =
   VM.Snapshot
     { code = code,
@@ -42,9 +47,11 @@ snapshotWithCode code =
       pc = 0
     }
 
-allOpsCode :: SV.Vector I.Instruction
-allOpsCode = V.fromList . map (`I.mkInstruction1` 1) $ replicate (neededLen - length opcodes) I.NoOp'K ++ opcodes
+allOpsCode :: SV.Vector I.W
+allOpsCode = V.fromList $ paddingWords ++ opWords
   where
-    opcodes = filter (/= I.Terminate'K) [minBound .. maxBound]
+    opWords = concatMap mkDefaultInstruction . filter (/= I.Terminate'K) $ [minBound .. maxBound]
+    mkDefaultInstruction opc = I.encodeOpCode opc : I.nonJumpArguments (I.opCodeMetadata opc)
+    neededLen = nearestPowerOf2 $ length opWords
     nearestPowerOf2 x = fromJust . find (>= x) $ iterate (* 2) 1
-    neededLen = nearestPowerOf2 $ length opcodes
+    paddingWords = replicate (neededLen - length opWords) (I.encodeOpCode I.NoOp'K)

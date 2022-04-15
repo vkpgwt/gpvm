@@ -9,7 +9,6 @@ import Data.Bits
 import Data.Foldable
 import qualified Data.Vector.Generic as V
 import qualified Data.Vector.Storable as SV
-import Data.Word
 import GHC.Base (NonEmpty ((:|)))
 import Records
 import SelectionEngine (Fitness, Handle (..))
@@ -31,7 +30,7 @@ selectionEngineHandle =
 -- {-# SCC toNumericFitness #-}
 
 data VM = VM
-  { code :: !(SV.Vector I.Instruction),
+  { code :: !(SV.Vector I.W),
     stackSize :: !Int
   }
 
@@ -43,8 +42,13 @@ instance Show VM where
         "\tcodeSize = " ++ show (V.length code),
         "\tcode = ["
       ]
-        ++ zipWith (\idx inst -> "\t\t" ++ I.display inst idx (V.length code)) [0 ..] (V.toList code)
+        ++ zipWith3 showInstruction (V.toList code) oneWordShiftedCode [0 ..]
         ++ ["\t]", "}"]
+    where
+      showInstruction op arg idx = "\t\t" ++ I.display op arg idx (V.length code)
+      oneWordShiftedCode = case V.toList code of
+        [] -> []
+        x : xs -> xs ++ [x]
 
 mkSnapshot :: VM -> VM.Snapshot
 mkSnapshot vm =
@@ -63,9 +67,9 @@ mutate vm@VM {..} gen = do
 
 data SingleIntructionMutation
   = MutateIBit !Int -- bitNo
-  | MutateIByte !Bool !Word8 -- byteNo, newByte
+  | MutateIByte !I.W -- newByte
 
-mutateInstructions :: (V.Vector v I.Instruction, RandomGenM g r m) => v I.Instruction -> g -> m (v I.Instruction)
+mutateInstructions :: (V.Vector v I.W, RandomGenM g r m) => v I.W -> g -> m (v I.W)
 mutateInstructions code gen = do
   let maxNumErrors = max 1 $ V.length code `div` oneErrorPerThisManyInstructions
   numErrors <- randomRM (0, maxNumErrors) gen
@@ -74,16 +78,13 @@ mutateInstructions code gen = do
     bitErrorNotRandomByte <- randomM gen
     mutation <-
       if bitErrorNotRandomByte
-        then MutateIBit <$> randomRM (0, finiteBitSize (I.getInstruction undefined) - 1) gen
-        else do
-          MutateIByte <$> randomM gen <*> randomM gen
+        then MutateIBit <$> randomRM (0, finiteBitSize (undefined :: I.W) - 1) gen
+        else MutateIByte <$> randomM gen
     pure (iAddr, mutation)
   pure $ V.accum mutateInstruction code mutations
   where
-    mutateInstruction (I.Instruction i) (MutateIBit bitNo) = I.Instruction $ complementBit i bitNo
-    mutateInstruction inst (MutateIByte opCodeNotArg newByte)
-      | opCodeNotArg = I.setOpCodeByte newByte inst
-      | otherwise = I.setArgByte newByte inst
+    mutateInstruction w (MutateIBit bitNo) = complementBit w bitNo
+    mutateInstruction _ (MutateIByte newW) = newW
 
 duplicateCodeSlicesRandomly :: (V.Vector v a, RandomGenM g r m) => v a -> g -> m (v a)
 duplicateCodeSlicesRandomly code gen

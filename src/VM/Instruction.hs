@@ -1,32 +1,24 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module VM.Instruction
-  ( Instruction (..),
-    OpCodeName (..),
-    opCodeByteOf,
-    opCodeName,
+  ( OpCodeName (..),
+    W,
+    InstructionMetadata (..),
+    opCodeMetadata,
     mkInstruction,
     mkInstruction1,
-    signedArgOf,
-    unsignedArgOf,
-    loadInt8,
-    terminate,
-    nop,
-    argByteOf,
-    setOpCodeByte,
-    setArgByte,
+    mkCode,
+    decodeOpCode,
+    encodeOpCode,
+    decodeSignedArg,
+    encodeSignedArg,
+    decodeUnsignedArg,
+    encodeUnsignedArg,
     display,
-    drop'P,
   )
 where
 
 import Data.Bits
 import Data.Int
 import qualified Data.Vector.Generic as V
-import qualified Data.Vector.Generic.Mutable as MV
-import qualified Data.Vector.Unboxed as UV
-import Data.Word
-import Foreign (Storable)
 import Text.Printf
 
 data OpCodeName
@@ -64,106 +56,103 @@ data OpCodeName
   | CJNe'PP
   deriving (Eq, Show, Read, Enum, Bounded)
 
-newtype Instruction = Instruction {getInstruction :: Int16}
-  deriving (Storable)
+type W = Int8
 
-mkInstruction1 :: OpCodeName -> Int8 -> Instruction
-mkInstruction1 opc arg = Instruction $ shiftL (fromIntegral arg) 8 .|. fromIntegral (fromEnum opc)
+newtype InstructionMetadata = InstructionMetadata
+  { -- | "Safe" argument word values to follow the instruction opcode. They are "safe"
+    -- so that the instruction does not change PC.
+    nonJumpArguments :: [W]
+  }
 
-mkInstruction :: OpCodeName -> Instruction
-mkInstruction opc = mkInstruction1 opc 1
+opCodeMetadata :: OpCodeName -> InstructionMetadata
+opCodeMetadata x = case x of
+  LoadInt8'U -> InstructionMetadata [0]
+  ExtendWord8'K -> InstructionMetadata [0]
+  Terminate'K -> InstructionMetadata []
+  NoOp'K -> InstructionMetadata []
+  Add'P -> InstructionMetadata []
+  Sub'P -> InstructionMetadata []
+  Mul'P -> InstructionMetadata []
+  Div'P -> InstructionMetadata []
+  Mod'P -> InstructionMetadata []
+  Inc'K -> InstructionMetadata []
+  Dec'K -> InstructionMetadata []
+  AndB'P -> InstructionMetadata []
+  OrB'P -> InstructionMetadata []
+  XorB'P -> InstructionMetadata []
+  NotB'K -> InstructionMetadata []
+  AndL'P -> InstructionMetadata []
+  OrL'P -> InstructionMetadata []
+  NotL'K -> InstructionMetadata []
+  Dup'U -> InstructionMetadata []
+  Drop'P -> InstructionMetadata []
+  Swap'K -> InstructionMetadata []
+  LoadS'U -> InstructionMetadata []
+  StoreS'P -> InstructionMetadata []
+  Jmp'K -> InstructionMetadata [0]
+  JmpZ'K -> InstructionMetadata [0]
+  JmpNZ'K -> InstructionMetadata [0]
+  CJGt'PP -> InstructionMetadata [0]
+  CJLt'PP -> InstructionMetadata [0]
+  CJGe'PP -> InstructionMetadata [0]
+  CJLe'PP -> InstructionMetadata [0]
+  CJEq'PP -> InstructionMetadata [0]
+  CJNe'PP -> InstructionMetadata [0]
 
-opCodeByteOf :: Instruction -> Word8
-opCodeByteOf = fromIntegral . getInstruction
-
-setOpCodeByte :: Word8 -> Instruction -> Instruction
-setOpCodeByte b (Instruction i) =
-  Instruction . fromIntegral @Word16 @Int16 $
-    fromIntegral i .&. 0xff00 .|. fromIntegral @Word8 @Word16 b
-
-opCodeName :: Word8 -> OpCodeName
-opCodeName byte
+decodeOpCode :: W -> OpCodeName
+decodeOpCode byte
   | value >= fromEnum (minBound @OpCodeName) && value <= fromEnum (maxBound @OpCodeName) = toEnum value
   | otherwise = NoOp'K
   where
     value = fromIntegral byte
 
-argByteOf :: Instruction -> Word8
-argByteOf = fromIntegral . (`unsafeShiftR` 8) . getInstruction
+mkInstruction :: OpCodeName -> [W]
+mkInstruction op = [encodeOpCode op]
 
-setArgByte :: Word8 -> Instruction -> Instruction
-setArgByte b (Instruction i) = Instruction $ (fromIntegral b `unsafeShiftL` 8) .|. (i .&. 0xff)
+mkInstruction1 :: OpCodeName -> Int -> [W]
+mkInstruction1 op arg = [encodeOpCode op, encodeSignedArg arg]
 
-signedArgOf :: Instruction -> Int
-signedArgOf = fromIntegral . (`unsafeShiftR` 8) . getInstruction
+mkCode :: V.Vector v W => [[W]] -> v W
+mkCode = V.fromList . concat
 
-unsignedArgOf :: Instruction -> Int
-unsignedArgOf = (.&. 0xff) . signedArgOf
+encodeOpCode :: OpCodeName -> W
+encodeOpCode = fromIntegral . fromEnum
 
-display :: Instruction -> Int -> Int -> String
-display i addr codeLen = printf "%04d | %-30s ; 0x%04X" addr mnemonics (getInstruction i)
+decodeSignedArg :: W -> Int
+decodeSignedArg = fromIntegral
+
+encodeSignedArg :: Int -> W
+encodeSignedArg = fromIntegral
+
+decodeUnsignedArg :: W -> Int
+decodeUnsignedArg = (.&. 0xFF) . fromIntegral
+
+encodeUnsignedArg :: Word -> W
+encodeUnsignedArg = fromIntegral
+
+display :: W -> W -> Int -> Int -> String
+display opCode nextWord addr codeLen = printf "%04d | %-30s ; 0x%02X" addr mnemonics unsignedOpCode
   where
     mnemonics = unwords $ show opName : args
-    opName = opCodeName $ opCodeByteOf i
+    opName = decodeOpCode opCode
+    unsignedOpCode = fromIntegral opCode .&. 0xFF :: Word
 
     args = case opName of
-      LoadInt8'U -> [signedArg]
-      ExtendWord8'K -> [unsignedArg]
-      LoadS'U -> [unsignedArg]
-      StoreS'P -> [unsignedArg]
-      Jmp'K -> [signedArg, jumpTargetAddr]
-      JmpZ'K -> [signedArg, jumpTargetAddr]
-      JmpNZ'K -> [signedArg, jumpTargetAddr]
-      CJEq'PP -> [signedArg, jumpTargetAddr]
-      CJNe'PP -> [signedArg, jumpTargetAddr]
-      CJLt'PP -> [signedArg, jumpTargetAddr]
-      CJGt'PP -> [signedArg, jumpTargetAddr]
-      CJGe'PP -> [signedArg, jumpTargetAddr]
-      CJLe'PP -> [signedArg, jumpTargetAddr]
+      LoadInt8'U -> [show signedArg]
+      ExtendWord8'K -> [show unsignedArg]
+      LoadS'U -> [show unsignedArg]
+      StoreS'P -> [show unsignedArg]
+      Jmp'K -> [show signedArg, jumpTargetAddr]
+      JmpZ'K -> [show signedArg, jumpTargetAddr]
+      JmpNZ'K -> [show signedArg, jumpTargetAddr]
+      CJEq'PP -> [show signedArg, jumpTargetAddr]
+      CJNe'PP -> [show signedArg, jumpTargetAddr]
+      CJLt'PP -> [show signedArg, jumpTargetAddr]
+      CJGt'PP -> [show signedArg, jumpTargetAddr]
+      CJGe'PP -> [show signedArg, jumpTargetAddr]
+      CJLe'PP -> [show signedArg, jumpTargetAddr]
       _ -> []
 
-    signedArg = show $ signedArgOf i
-    unsignedArg = show $ unsignedArgOf i
-    jumpTargetAddr = printf "(#%04d)" $ (addr + signedArgOf i) `mod` codeLen
-
-loadInt8 :: Int8 -> Instruction
-loadInt8 = mkInstruction1 LoadInt8'U
-
-terminate :: Instruction
-terminate = mkInstruction Terminate'K
-
-nop :: Instruction
-nop = mkInstruction NoOp'K
-
-drop'P :: Instruction
-drop'P = mkInstruction Drop'P
-
-newtype instance UV.MVector s Instruction = InstructionMVector (UV.MVector s Int16)
-
-newtype instance UV.Vector Instruction = InstructionVector (UV.Vector Int16)
-
-instance MV.MVector UV.MVector Instruction where
-  basicLength (InstructionMVector v) = MV.basicLength v
-  basicUnsafeSlice x y (InstructionMVector v) = InstructionMVector $ MV.basicUnsafeSlice x y v
-  basicOverlaps (InstructionMVector v1) (InstructionMVector v2) = MV.basicOverlaps v1 v2
-  basicUnsafeNew n = InstructionMVector <$> MV.basicUnsafeNew n
-  basicInitialize (InstructionMVector v) = MV.basicInitialize v
-  basicUnsafeReplicate n (Instruction a) = InstructionMVector <$> MV.basicUnsafeReplicate n a
-  basicUnsafeRead (InstructionMVector v) i = Instruction <$> MV.basicUnsafeRead v i
-  basicUnsafeWrite (InstructionMVector v) i (Instruction a) = MV.basicUnsafeWrite v i a
-  basicClear (InstructionMVector v) = MV.basicClear v
-  basicSet (InstructionMVector v) a = MV.basicSet v (getInstruction a)
-  basicUnsafeCopy (InstructionMVector v1) (InstructionMVector v2) = MV.basicUnsafeCopy v1 v2
-  basicUnsafeMove (InstructionMVector v1) (InstructionMVector v2) = MV.basicUnsafeMove v1 v2
-  basicUnsafeGrow (InstructionMVector v) n = InstructionMVector <$> MV.basicUnsafeGrow v n
-
-instance V.Vector UV.Vector Instruction where
-  basicUnsafeFreeze (InstructionMVector v) = InstructionVector <$> V.basicUnsafeFreeze v
-  basicUnsafeThaw (InstructionVector v) = InstructionMVector <$> V.basicUnsafeThaw v
-  basicLength (InstructionVector v) = V.basicLength v
-  basicUnsafeSlice i n (InstructionVector v) = InstructionVector $ V.basicUnsafeSlice i n v
-  basicUnsafeIndexM (InstructionVector v) i = Instruction <$> V.basicUnsafeIndexM v i
-  basicUnsafeCopy (InstructionMVector mv) (InstructionVector v) = V.basicUnsafeCopy mv v
-  elemseq _ (Instruction a) = V.elemseq (undefined :: UV.Vector a) a
-
-instance UV.Unbox Instruction
+    signedArg = decodeSignedArg nextWord
+    unsignedArg = decodeUnsignedArg nextWord
+    jumpTargetAddr = printf "(#%04d)" $ (addr + signedArg) `mod` codeLen

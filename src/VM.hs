@@ -28,7 +28,7 @@ import qualified VM.Instruction as I
 type W = Int
 
 data Snapshot = Snapshot
-  { code :: !(SV.Vector I.Instruction),
+  { code :: !(SV.Vector I.W),
     stack :: !(UV.Vector W),
     sp :: !Int,
     pc :: !Int
@@ -40,7 +40,7 @@ newtype ResultingSnapshot = ResultingSnapshot {stackTop :: W}
 type Run s a = ReaderT (ROData s) (StateT MutData (ST s)) a
 
 data ROData s = ROData
-  { roCode :: {-# UNPACK #-} !(SV.Vector I.Instruction),
+  { roCode :: {-# UNPACK #-} !(SV.Vector I.W),
     roStack :: {-# UNPACK #-} !(UMV.MVector s W)
   }
 
@@ -110,12 +110,13 @@ runMut !_ maxSteps
 
 step :: Run s StepResult
 step = do
-  instr <- currentInstruction
+  opCode <- currentInstructionWord
   incPC 1
+  argWord <- currentInstructionWord
 
-  let opcode = I.opCodeName $ I.opCodeByteOf instr
-      signedArg = I.signedArgOf instr
-      unsignedArg = I.unsignedArgOf instr
+  let opcode = I.decodeOpCode opCode
+      signedArg = I.decodeSignedArg argWord
+      unsignedArg = I.decodeUnsignedArg argWord
 
   case opcode of
     I.LoadInt8'U -> do
@@ -202,8 +203,8 @@ step = do
     boolToW False = 0
     wToBool x = x /= 0
 
-currentInstruction :: Run s I.Instruction
-currentInstruction = asks (V.unsafeIndex . roCode) <*> gets mutPC
+currentInstructionWord :: Run s I.W
+currentInstructionWord = asks (V.unsafeIndex . roCode) <*> gets mutPC
 
 getStackW :: Int -> Run s W
 getStackW relIdx = do
